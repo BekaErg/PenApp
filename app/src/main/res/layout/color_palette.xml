@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal">
+
+
+    <FrameLayout
+        android:id="@+id/color_circle_frame_0"
+        android:tag="0"
+        style="@style/color_circle_frame_style">
+        <ImageView
+            android:src="@drawable/selected_color_circle"
+            style="@style/selection_ring_style" />
+        <ImageView
+            android:src="@drawable/circle_mask"
+            style="@style/color_circle_style" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/color_circle_frame_1"
+        android:tag="1"
+        style="@style/color_circle_frame_style">
+        <ImageView
+            android:src="@drawable/selected_color_circle"
+            style="@style/selection_ring_style" />
+        <ImageView
+            android:src="@drawable/circle_mask"
+            style="@style/color_circle_style" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/color_circle_frame_2"
+        android:tag="2"
+        style="@style/color_circle_frame_style">
+        <ImageView
+            android:src="@drawable/selected_color_circle"
+            style="@style/selection_ring_style" />
+        <ImageView
+            android:src="@drawable/circle_mask"
+            style="@style/color_circle_style" />
+    </FrameLayout>
+</merge>

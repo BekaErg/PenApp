@@ -1,0 +1,38 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Theme.DrawingApp" parent="Theme.MaterialComponents.DayNight">
+        <!-- Primary brand color. -->
+        <item name="colorPrimary">@color/tool_color</item>
+        <item name="colorPrimaryVariant">#1B1B1B</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <!-- Secondary brand color. -->
+        <item name="colorSecondary">@color/colorSecondaryDay</item>
+        <item name="colorSecondaryVariant">@color/grey</item>
+        <item name="colorOnSecondary">@color/black</item>
+        <item name="android:textColorSecondary">@color/textColorSecondary</item>
+
+        <!-- Status bar color. -->
+        <item name="android:statusBarColor" tools:targetApi="l">?attr/colorPrimaryVariant</item>
+        <!-- Customize your theme here. -->
+    </style>
+
+
+    <style name="Theme.App" parent="Theme.DrawingApp">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="textAppearanceLargePopupMenu">@style/TextAppearance.App.Subtitle1</item>
+        <item name="textAppearanceSmallPopupMenu">@style/TextAppearance.App.Subtitle1</item>
+        <item name="popupMenuBackground">@drawable/menu_background</item>
+
+    </style>
+
+    <style name="TextAppearance.App.Subtitle1" parent="TextAppearance.MaterialComponents.Subtitle1">
+        <item name="android:textColor">@color/tool_color</item>
+    </style>
+
+
+    <style name = "SettingsTheme" parent = "@style/Theme.DrawingApp">
+    </style>
+
+
+</resources>

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal">
+
+
+    <FrameLayout
+        android:id="@+id/pen_frame"
+        android:clickable="true"
+        android:focusable="true"
+        style="@style/color_circle_frame_style">
+        <ImageView
+            android:src="@drawable/selected_color_circle"
+            style="@style/selection_ring_style" />
+        <ImageView
+            android:src="@drawable/ic_pen"
+            style="@style/color_circle_style" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/line_frame"
+        android:clickable="true"
+        android:focusable="true"
+        style="@style/color_circle_frame_style">
+        <ImageView
+            android:src="@drawable/selected_color_circle"
+            style="@style/selection_ring_style" />
+        <ImageView
+            android:src="@drawable/line_tool"
+            android:scaleX="-1"
+            style="@style/color_circle_style" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/eraser_icon"
+        android:clickable="true"
+        android:focusable="true"
+        style="@style/color_circle_frame_style">
+        <ImageView
+            android:src="@drawable/selected_color_circle"
+            style="@style/selection_ring_style" />
+        <ImageView
+            android:src="@drawable/ic_eraser"
+            style="@style/color_circle_style"
+            android:rotation="10"
+            android:scaleX="0.85"
+            android:scaleY="0.85"/>
+    </FrameLayout>
+
+</merge>

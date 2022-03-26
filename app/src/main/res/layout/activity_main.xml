@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/dark_grey"
+    app:barrierDirection="right"
+    tools:context=".MainActivity">
+
+
+    <com.example.drawingapp.ZoomViewGroup
+        android:id="@+id/canvas_container"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@color/background_grey"
+        android:foregroundGravity="center"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/toolbar_background" />
+
+
+    <!-- ToolBar
+    <com.example.drawingapp.DrawView
+        android:id="@+id/canvas_container"
+        android:layout_width="520dp"
+        android:layout_height="830dp"
+        android:src="@drawable/ic_settings"
+        android:background="@color/black"
+        android:focusableInTouchMode="true"
+        android:foregroundGravity="center"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/toolbar_background" />
+    -->
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar_background"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@color/dark_grey"
+        android:contentDescription="@string/toolbar_header_background"
+        app:layout_constraintBottom_toBottomOf="@id/color_palette_main"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <com.example.drawingapp.ColorPalette
+        android:id="@+id/color_palette_main"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="2dp"
+        app:layout_constraintBottom_toBottomOf="@id/toolbar_background"
+        app:layout_constraintEnd_toStartOf="@+id/divisor1"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintHorizontal_chainStyle="packed"
+        app:layout_constraintStart_toStartOf="@id/toolbar_background"
+        app:layout_constraintTop_toTopOf="@id/toolbar_background" />
+
+    <com.google.android.material.divider.MaterialDivider
+        android:id="@+id/divisor1"
+        android:layout_width="0.8dp"
+        android:layout_height="0dp"
+        android:layout_gravity="center"
+        android:layout_marginHorizontal="5dp"
+        android:layout_marginVertical="8dp"
+        app:dividerColor="@color/grey"
+        android:alpha="0.3"
+        app:layout_constraintBottom_toBottomOf="@+id/color_palette_main"
+        app:layout_constraintEnd_toStartOf="@+id/drawing_tools"
+        app:layout_constraintStart_toEndOf="@+id/color_palette_main"
+        app:layout_constraintTop_toTopOf="@+id/color_palette_main"
+        tools:ignore="ImageContrastCheck" />
+
+
+
+    <com.example.drawingapp.ToolSelectorLayout
+        android:id="@+id/drawing_tools"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintBottom_toBottomOf="@+id/divisor1"
+        app:layout_constraintEnd_toStartOf="@+id/divisor2"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintStart_toEndOf="@+id/divisor1"
+        app:layout_constraintTop_toTopOf="@+id/divisor1" />
+
+    <com.google.android.material.divider.MaterialDivider
+        android:id="@+id/divisor2"
+        android:layout_width="0.8dp"
+        android:layout_height="0dp"
+        android:layout_gravity="center"
+        android:layout_marginHorizontal="5dp"
+        android:layout_marginVertical="8dp"
+        app:dividerColor="@color/grey"
+        android:alpha="0.3"
+        app:layout_constraintBottom_toBottomOf="@+id/drawing_tools"
+        app:layout_constraintEnd_toStartOf="@+id/brush_size_icon"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintStart_toEndOf="@+id/drawing_tools"
+        app:layout_constraintTop_toTopOf="@+id/drawing_tools"
+        tools:ignore="ImageContrastCheck" />
+
+
+    <ImageView
+        android:id="@+id/dummy_brush_size"
+        style="@style/color_circle_frame_style"
+        android:alpha="0.2"
+        android:contentDescription="@string/brush_size_icon"
+        android:padding="3dp"
+        android:scaleX="1"
+        android:scaleY="1"
+        android:src="@drawable/brush_size"
+        app:layout_constraintBottom_toBottomOf="@+id/brush_size_icon"
+        app:layout_constraintEnd_toEndOf="@id/brush_size_icon"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintStart_toStartOf="@+id/brush_size_icon"
+        app:layout_constraintTop_toTopOf="@+id/brush_size_icon" />
+
+
+    <ImageView
+        android:id="@+id/brush_size_icon"
+        style="@style/color_circle_frame_style"
+        android:contentDescription="@string/brush_size_icon_dynamic"
+        android:padding="3dp"
+        android:scaleX="0.5"
+        android:scaleY="0.5"
+        android:src="@drawable/brush_size"
+        app:layout_constraintBottom_toBottomOf="@+id/divisor2"
+        app:layout_constraintEnd_toStartOf="@+id/opacity_icon"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintStart_toEndOf="@+id/divisor2"
+        app:layout_constraintTop_toTopOf="@+id/divisor2" />
+
+    <ProgressBar
+        android:id="@+id/opacity_icon"
+        style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:max="100"
+        android:padding="3dp"
+        android:progress="100"
+        android:progressDrawable="@drawable/opacity_progress_bar"
+        android:rotation="270"
+        android:layout_marginEnd="30dp"
+        app:layout_constraintBottom_toBottomOf="@+id/divisor2"
+        app:layout_constraintEnd_toEndOf="@+id/toolbar_background"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintStart_toEndOf="@+id/brush_size_icon"
+        app:layout_constraintTop_toTopOf="@+id/divisor2" />
+
+
+
+
+    <!-- slider and ColorPicker -->
+
+    <com.google.android.material.slider.Slider
+        android:id="@+id/brush_slider"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:alpha="0.8"
+        android:background="@drawable/background_rectangle"
+        android:elevation="2dp"
+        android:stepSize="1"
+        android:valueFrom="1"
+        android:valueTo="100"
+        android:visibility="invisible"
+        app:layout_constraintEnd_toEndOf="@+id/dummy_brush_size"
+        app:layout_constraintStart_toStartOf="@+id/dummy_brush_size"
+        app:layout_constraintTop_toBottomOf="@+id/toolbar_background"
+        app:layout_constraintWidth_max="150dp"
+        app:layout_constraintWidth_min="130dp" />
+
+    <!-- slider and ColorPicker -->
+
+    <com.google.android.material.slider.Slider
+        android:id="@+id/opacity_slider"
+        android:layout_width="126dp"
+        android:layout_height="wrap_content"
+        android:alpha="0.8"
+        android:background="@drawable/background_rectangle"
+        android:elevation="2dp"
+        android:stepSize="1"
+        android:valueFrom="0"
+        android:valueTo="100"
+        android:visibility="invisible"
+        app:layout_constraintEnd_toEndOf="@+id/opacity_icon"
+        app:layout_constraintStart_toEndOf="@+id/divisor2"
+        app:layout_constraintTop_toBottomOf="@+id/toolbar_background"
+        app:layout_constraintWidth_max="150dp"
+        app:layout_constraintWidth_min="130dp" />
+
+
+
+
+    <LinearLayout
+        android:id="@+id/more_options_layout"
+        android:background="@drawable/card_background"
+        android:layout_width="150dp"
+        android:layout_height="wrap_content"
+        android:layout_margin="3dp"
+        android:layout_marginTop="3dp"
+        android:contentDescription="@string/more_options_card"
+        android:elevation="2dp"
+        android:padding="0dp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/toolbar_background"
+        android:orientation="vertical">
+
+        <Button
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:id="@+id/tv_clear_image"
+            android:tag="clear_image"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end"
+            android:textColor="@color/tool_color"
+            android:text="@string/clear_canvas"
+            android:gravity="end"
+            />
+
+
+        <TextView
+            android:id="@+id/tv_save_image"
+            android:tag="save_image"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:layout_gravity="end"
+            android:textColor="@color/tool_color"
+            android:text="@string/save_image"
+            android:gravity="end"/>
+
+        <TextView
+            android:id="@+id/tv_settings"
+            android:tag="settings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:layout_gravity="end"
+            android:textColor="@color/tool_color"
+            android:text="@string/settings"
+            android:gravity="end"/>
+    </LinearLayout>
+
+
+
+
+
+    <com.jarti.ColorPickerView.ColorPickerView
+        android:id="@+id/color_picker_view"
+        android:layout_width="240dp"
+        android:layout_height="339dp"
+        android:layout_centerInParent="true"
+        android:layout_marginTop="3dp"
+        android:clickable="false"
+        android:elevation="3dp"
+        android:visibility="invisible"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/color_palette_main" />
+
+
+
+
+
+    <ImageView
+        android:id="@+id/undo_button"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_margin="10dp"
+        android:scaleX="-1"
+        android:src="@drawable/ic_baseline_next_plan_24"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- backbutton -->
+    <ImageView
+        android:id="@+id/redo_button"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_margin="10dp"
+        android:src="@drawable/ic_baseline_next_plan_24"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+
+
+
+
+
+
+
+</androidx.constraintlayout.widget.ConstraintLayout>

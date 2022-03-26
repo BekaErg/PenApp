@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item  android:id="@+id/item0"
+        android:title=""
+        android:icon="@drawable/ic_three_dots_vertical"
+        app:showAsAction="always"
+        >
+        <menu>
+            <item  android:id="@+id/save_image"
+                android:title="@string/save_image"
+                android:icon="@drawable/ic_baseline_save_24" />
+
+            <item  android:id="@+id/load_image"
+                android:title="@string/load_image"
+                android:icon="@drawable/ic_baseline_save_24" />
+
+            <item
+                android:checkable="true"
+                android:checked="true"
+                android:id="@+id/lock_zoom"
+                android:title="@string/lock_zoom" />
+
+            <item  android:id="@+id/clear_canvas"
+                android:title="@string/clear_canvas"
+                android:icon="@drawable/ic_clear_canvas"/>
+
+            <item  android:id="@+id/open_settings"
+                android:title="@string/settings"
+                android:icon="@drawable/ic_settings"/>
+
+        </menu>
+    </item>
+
+
+
+</menu>

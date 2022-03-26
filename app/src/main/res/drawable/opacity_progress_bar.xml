@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/ic_transparent_background_circular"/>
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#00000000"/>
+        </shape>
+    </item>
+
+    <item
+        android:left="4dp"
+        android:right="4dp"
+        android:top="4dp"
+        android:bottom="4dp">
+        <clip>
+            <shape android:shape="oval">
+                <solid
+                    android:color="@color/tool_color"
+                    />
+                <corners
+                    android:bottomRightRadius="10dp"
+                    android:topRightRadius="10dp"
+                    />
+            </shape>
+        </clip>
+    </item>
+
+    <item>
+        <shape android:shape="oval">
+            <stroke android:color="#FF444444"
+                android:width="0.5dp"/>
+        </shape>
+    </item>
+
+
+
+
+
+
+</layer-list>
+
+
+<!--
+android:startColor="#588f66"
+                    android:centerColor="#76b787"
+                    android:centerY="0.50"
+                    android:endColor="#588f66"
+                    android:angle="270"
+-->
