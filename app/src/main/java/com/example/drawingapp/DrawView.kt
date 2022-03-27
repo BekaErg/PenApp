@@ -2,6 +2,7 @@ package com.example.drawingapp
 
 import android.content.Context
 import android.graphics.*
+import android.graphics.drawable.PictureDrawable
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
@@ -27,23 +28,24 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
 
      */
 
+    private var pictureDrawable =PictureDrawable(Picture())
+    private var picture = Picture()
+    private var finalPicture = Picture()
+
     private var drawingStarted = false
-    private var mPrevTouchX = 0f
-    private var mPrevTouchY = 0f
     private var mCurTouchX = 0f
     private var mCurTouchY = 0f
-    private var mPrevStrokeRadius = 0f
     private var mCurStrokeRadius = 0f
 
-    private val mEpsilon = 0.1f
-    private val mEraserRadius = 25f
-    private var mGap = 0f
 
+    private var mDynPath = DynPath()
+
+    private val mEraserRadius = 25f
     private var mEraser = Path()
     private var mErasedIndices = arrayListOf<Int>()
     private var mPaint = Paint().apply {
         isAntiAlias = true
-        style = Paint.Style.FILL
+        style = Paint.Style.STROKE
         strokeWidth = 0.5f
         strokeJoin = Paint.Join.ROUND
         strokeCap = Paint.Cap.ROUND
@@ -57,7 +59,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
     }
 
     private var mPath = Path().apply{fillType = Path.FillType.WINDING}
-    private var mTempPath = Path().apply{fillType = Path.FillType.WINDING}
+    private var mTempPath = Path().apply{}
 
     private var mRegion = Region()
 
@@ -69,17 +71,21 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
         this.isFocusableInTouchMode = true
     }
 
+
     override fun onDraw(canvas : Canvas) {
         super.onDraw(canvas)
-        //canvas.save();
-        //canvas.scale(mScaleFactor, mScaleFactor);
-        //canvas.drawCircle(222f, 222f, 200f, mPaint)
+
         for (parameters in mStrokeHistory) {
             if (parameters.isErased || parameters.toolType == TOOL_ERASER) {continue}
             updatePaint(parameters)
-            canvas.drawPath(parameters.path, mPaint)
+            //parameters.dynPath.drawPicture(canvas)
+            parameters.dynPath.draw(canvas, mPaint)
+            parameters.dynPath.drawSpine(canvas, mPaint)
         }
-        canvas.drawPath(mEraser, mEraserPaint)
+
+        //pictureDrawable.draw(canvas)
+        //canvas.drawPicture(finalPicture)
+        //canvas.drawPath(mEraser, mEraserPaint)
         //canvas.restore()
     }
 
@@ -93,8 +99,8 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
         when (selectedTool) {
             TOOL_PEN, TOOL_LINE -> {
                 mStrokeHistory.removeLast()
-                mPath = Path().apply{fillType = Path.FillType.WINDING}
-                //Toast.makeText(context, "stroke has been cancelled", Toast.LENGTH_SHORT).show()
+                mPath = Path().apply{}
+                Toast.makeText(context, "stroke has been cancelled", Toast.LENGTH_SHORT).show()
             }
             TOOL_ERASER -> {
                 if (mErasedIndices.isNotEmpty()) {
@@ -108,7 +114,6 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
         }
     }
 
-
     override fun onTouchEvent(event : MotionEvent) : Boolean {
         this.requestFocus()
 
@@ -117,7 +122,6 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
             return true
         }
         //mScaleDetector.onTouchEvent(event);
-
         mCurTouchX = event.x
         mCurTouchY = event.y
 
@@ -142,18 +146,14 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
                 mStrokeHistory.add(DrawingParameters())
                 drawingStarted = true
                 mCurStrokeRadius = strokeSize / 2
-                mPrevStrokeRadius = mCurStrokeRadius
-                mPrevTouchX = mCurTouchX
-                mPrevTouchY = mCurTouchY
-                extendPath()
+                mDynPath.moveTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
             }
             MotionEvent.ACTION_MOVE -> {
-                mPath.rewind()
-                mPath.addCircle(mPrevTouchX, mPrevTouchY, mCurStrokeRadius, Path.Direction.CCW)
-                extendPath()
+                mDynPath.restart()
+                mDynPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
             }
             MotionEvent.ACTION_UP -> {
-                mPath = Path().apply{fillType = Path.FillType.WINDING}
+                mDynPath = DynPath()
                 drawingStarted = false
             }
             else -> return false
@@ -167,34 +167,28 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
             //Toast.makeText(context,"finger is turned off ", Toast.LENGTH_SHORT).show()
             return true
         }
-
         when (event.action) {
             MotionEvent.ACTION_DOWN-> {
                 mStrokeFuture.clear()
                 mStrokeHistory.add(DrawingParameters())
                 drawingStarted = true
-                mPath.moveTo(mCurTouchX,mCurTouchY)
 
-                //At this stage we only need to apply pressure to store in the mPrevPressure
                 applyPressure(event.getPressure(0))
-                setPrevVariables()
+                mDynPath.moveTo(mCurTouchX,mCurTouchY, mCurStrokeRadius)
+                //At this stage we only need to apply pressure to store in the mPrevPressure
+
             }
             MotionEvent.ACTION_MOVE -> {
-
                 for (i in 0 until event.historySize) {
                     mCurTouchX = event.getHistoricalX(i)
                     mCurTouchY = event.getHistoricalY(i)
-
-                    //if cur coordinates id too close to prev, we do not draw at all
-                    if (!gapIsTooSmall()) {
-                        applyPressure(event.getHistoricalPressure(i))
-                        extendPath()
-                        setPrevVariables()
-                    }
+                    applyPressure(event.getHistoricalPressure(i))
+                    mDynPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
+                    //TODO gap is too small
                 }
             }
             MotionEvent.ACTION_UP -> {
-                mPath = Path().apply{fillType = Path.FillType.WINDING}
+                mDynPath = DynPath()
                 drawingStarted = false
             }
             else -> return false
@@ -240,9 +234,8 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
         for (i in 0 until n) {
             val parameters = mStrokeHistory[i]
             if (parameters.toolType == TOOL_ERASER || parameters.isErased) continue
-
             mRegion.setEmpty()
-            mRegion.setPath(parameters.path, clip)
+            mRegion.setPath(parameters.dynPath.contourPath, clip)
             if (!mRegion.isEmpty) {
                 parameters.isErased = true
                 mErasedIndices.add(i)
@@ -258,38 +251,9 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
 
     private fun updatePaint(parameters: DrawingParameters) {
         mPaint.color = parameters.color
-        mPaint.strokeWidth = parameters.brushSize
+        //mPaint.strokeWidth = parameters.brushSize
+        mPaint.strokeWidth = 0.5f
         mPaint.alpha = (parameters.alpha * 255).toInt()
-    }
-
-    private fun setPrevVariables() {
-        mPrevTouchX = mCurTouchX
-        mPrevTouchY = mCurTouchY
-        mPrevStrokeRadius = mCurStrokeRadius
-    }
-
-    private fun gapIsTooSmall(): Boolean {
-        mGap = mEpsilon * mCurStrokeRadius
-        return mCurTouchX - mPrevTouchX < mGap && mCurTouchY - mPrevTouchY < mGap && mPrevTouchX - mCurTouchX < mGap && mPrevTouchY - mCurTouchY < mGap
-    }
-
-    private fun extendPath(){
-        var normalX = -(mCurTouchY - mPrevTouchY)
-        var normalY = (mCurTouchX - mPrevTouchX)
-        val norm = sqrt( normalX * normalX + normalY * normalY)
-        normalX /= norm
-        normalY /= norm
-
-        mPath.moveTo(mPrevTouchX - normalX * mPrevStrokeRadius, mPrevTouchY - normalY * mPrevStrokeRadius)
-        mPath.lineTo(mPrevTouchX + normalX * mPrevStrokeRadius, mPrevTouchY + normalY * mPrevStrokeRadius)
-        mPath.lineTo(mCurTouchX + normalX * mCurStrokeRadius, mCurTouchY + normalY * mCurStrokeRadius)
-        mPath.lineTo(mCurTouchX - normalX * mCurStrokeRadius, mCurTouchY - normalY * mCurStrokeRadius)
-        mPath.close()
-
-        //mTempPath.addCircle(mCurTouchX, mCurTouchY, mCurStrokeRadius, Path.Direction.CW)
-        //mTempPath.op(p, Path.Op.UNION)
-        mPath.addCircle(mCurTouchX, mCurTouchY, mCurStrokeRadius, Path.Direction.CCW)
-        mPath.addPath(mTempPath)
     }
 
     fun undo() {
@@ -337,25 +301,10 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
         val alpha = opacity
         val toolType = selectedTool
         val path = mPath
+        val dynPath = mDynPath
         val eraserIdx = mErasedIndices
         var isErased = false
     }
-
-    /*
-    private var mScaleDetector = ScaleGestureDetector(context, ScaleListener())
-    private var mScaleFactor = 1f
-    private inner class ScaleListener : SimpleOnScaleGestureListener() {
-        override fun onScale(detector : ScaleGestureDetector) : Boolean {
-            mScaleFactor *= detector.scaleFactor
-
-            // Don't let the object get too small or too large.
-            mScaleFactor = Math.max(0.1f, Math.min(mScaleFactor, 5.0f))
-            invalidate()
-            return true
-        }
-    }
-
-     */
 
 
     companion object {
@@ -364,158 +313,3 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
         const val TOOL_ERASER = 2
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*
-
-
-
-
-    private fun lineDrawing(action : Int): Boolean {
-        when (action) {
-            MotionEvent.ACTION_DOWN-> {
-                mStrokeFuture.clear()
-                mStrokeHistory.add(DrawingParameters())
-
-                mPrevTouchX = mCurTouchX
-                mPrevTouchY = mCurTouchY
-                mPath.moveTo(mPrevTouchX, mPrevTouchY)
-                mPath.lineTo(mCurTouchX, mCurTouchY)
-            }
-            MotionEvent.ACTION_MOVE -> {
-                mPath.rewind()
-                mPath.moveTo(mPrevTouchX, mPrevTouchY)
-                mPath.lineTo(mCurTouchX, mCurTouchY)
-            }
-            MotionEvent.ACTION_UP -> {
-                mPath = Path()
-            }
-            else -> return false
-        }
-        invalidate()
-        return true
-    }
-
-
-
-private fun erasing(event: MotionEvent): Boolean {
-        when (event.action) {
-            MotionEvent.ACTION_DOWN-> {
-
-                //Clear Redo array and add current parameters to the History array
-                mStrokeFuture.clear()
-                mStrokeHistory.add(DrawingParameters())
-
-                mPath.moveTo(mCurTouchX, mCurTouchY)
-                mTempPath = Path(mPath)
-
-                mTempStrokeSize = strokeSize * event.getPressure(0)
-                mPrevTouchX = mCurTouchX
-                mPrevTouchY = mCurTouchY
-                mPrevDx = 5*mTempStrokeSize
-                mPrevDy = 0f
-            }
-            MotionEvent.ACTION_MOVE -> {
-                val historySize : Int = event.historySize
-                for (i in 0 until historySize) {
-                    mTempStrokeSize = strokeSize * event.getHistoricalPressure(0, i)
-                    mCurTouchX = event.getHistoricalX(i)
-                    mCurTouchY = event.getHistoricalY(i)
-
-                    if (gapIsTooSmall()) continue
-                    //calculate cur dx and dy
-                    mdx = 5*mTempStrokeSize
-                    mdy = 0f
-
-                    //Build TempPath Loop
-                    newChunkOfPath()
-
-                    //Add TempPath to mPath and clear it
-                    mPath.addPath(mTempPath)
-                    //mPath.op(mTempPath, Path.Op.UNION)
-                    mTempPath.rewind()
-
-                    //Replace prevVariables with current
-                    setPrevVariables()
-                }
-
-            }
-            MotionEvent.ACTION_UP -> {
-                mTempStrokeSize = strokeSize * event.getPressure(0)
-                mdx = mTempStrokeSize
-                mdy = 0f
-                newChunkOfPath()
-                //mPath.op(mTempPath, Path.Op.UNION)
-                mPath = Path().apply{fillType = Path.FillType.WINDING}
-            }
-            else -> return false
-        }
-        invalidate()
-        return true
-
-    }
-
-
-
-        fun erase() {
-            startX = null
-            startY = null
-            endX = null
-            endY = null
-        }
-
-private lateinit var mCanvasBitmap: Bitmap
-private var canvas: Canvas? = null
-override fun onSizeChanged(w : Int, h : Int, oldw : Int, oldh : Int) {
-    super.onSizeChanged(w, h, oldw, oldh)
-    mCanvasBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    canvas = Canvas(mCanvasBitmap!!)
-}
-
-
-override fun onSizeChanged(w: Int, h: Int, wprev: Int, hprev: Int) {
-        super.onSizeChanged(w, h, wprev, hprev)
-        val mCanvasBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        canvas = Canvas(mCanvasBitmap!!)
-
-        mRect2.left = 700f - mBrushSize
-        mRect2.right = 700f + mBrushSize
-        mRect2.bottom = 900f + mBrushSize
-        mRect2.top = 900f - mBrushSize
-        canvas.drawBitmap(mBitmap, null, mRect2, mPaint)
-    }
-
-
-
-
-        private fun customLine(x1: Float, y1: Float, x2: Float, y2: Float, r1: Float, r2: Float){
-        var normalX = -(y2 - y1)
-        var normalY = (x2 - x1)
-        val norm = sqrt( normalX * normalX + normalY * normalY)
-        normalX /= norm
-        normalY /= norm
-
-        mPath.moveTo(x1 - normalX * r1, y1 - normalY * r1)
-        mPath.lineTo(x1 + normalX * r1, y1 + normalY * r1)
-        mPath.lineTo(x2 + normalX * r2, y2 + normalY * r2)
-        mPath.lineTo(x2 - normalX * r2, y2 - normalY * r2)
-        mPath.close()
-
-        //mTempPath.addCircle(x1, y1, r1, Path.Direction.CW)
-        mPath.addCircle(x2, y2, r2, Path.Direction.CCW)
-        //mTempPath.op(mTempTempPath, Path.Op.UNION)
-    }
- */
