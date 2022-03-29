@@ -46,7 +46,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
     private var mPaint = Paint().apply {
         isAntiAlias = true
         style = Paint.Style.STROKE
-        strokeWidth = 0.5f
+        strokeWidth = 10f
         strokeJoin = Paint.Join.ROUND
         strokeCap = Paint.Cap.ROUND
     }
@@ -67,6 +67,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
     private val mStrokeHistory = arrayListOf<DrawingParameters>()
     private val mStrokeFuture = arrayListOf<DrawingParameters>()
 
+
     init {
         this.isFocusableInTouchMode = true
     }
@@ -80,11 +81,9 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
             updatePaint(parameters)
             //parameters.dynPath.drawPicture(canvas)
             parameters.dynPath.draw(canvas, mPaint)
-            parameters.dynPath.drawSpine(canvas, mPaint)
+            //parameters.dynPath.drawSpine(canvas, mPaint)
         }
 
-        //pictureDrawable.draw(canvas)
-        //canvas.drawPicture(finalPicture)
         //canvas.drawPath(mEraser, mEraserPaint)
         //canvas.restore()
     }
@@ -172,22 +171,25 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
                 mStrokeFuture.clear()
                 mStrokeHistory.add(DrawingParameters())
                 drawingStarted = true
-
                 applyPressure(event.getPressure(0))
                 mDynPath.moveTo(mCurTouchX,mCurTouchY, mCurStrokeRadius)
                 //At this stage we only need to apply pressure to store in the mPrevPressure
-
             }
             MotionEvent.ACTION_MOVE -> {
                 for (i in 0 until event.historySize) {
                     mCurTouchX = event.getHistoricalX(i)
                     mCurTouchY = event.getHistoricalY(i)
                     applyPressure(event.getHistoricalPressure(i))
+
                     mDynPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
                     //TODO gap is too small
                 }
             }
             MotionEvent.ACTION_UP -> {
+
+                mDynPath.quadSmooth(0)
+                //mDynPath.finalPath()
+                //mDynPath.finishLine()
                 mDynPath = DynPath()
                 drawingStarted = false
             }
@@ -252,7 +254,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
     private fun updatePaint(parameters: DrawingParameters) {
         mPaint.color = parameters.color
         //mPaint.strokeWidth = parameters.brushSize
-        mPaint.strokeWidth = 0.5f
+        mPaint.strokeWidth = 1f
         mPaint.alpha = (parameters.alpha * 255).toInt()
     }
 
