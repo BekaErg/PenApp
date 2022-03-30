@@ -116,83 +116,7 @@ class DynPath{
         this.moveTo(firstX, firstY, firstRad)
     }
 
-    /*
-
-    fun finishLine() {
-        contourPath = Path().apply { fillType = Path.FillType.WINDING }
-        prevX = firstX
-        prevY = firstY
-        contourPath.moveTo(firstX, firstY)
-        var i = 0;
-        for (j in 0 until 2*mKeyPointsX.size - 1) {
-
-            i = j.coerceAtMost(2 * mKeyPointsX.size - 1 - j)
-            assert(i < mRadiuses.size) {
-                "i is out of range $i  ${mRadiuses.size}  $j"
-            }
-
-            lastX = mKeyPointsX[i]
-            lastY = mKeyPointsY[i]
-            mRadius = mRadiuses[i]
-
-            var normalX = -(lastY - prevY)
-            var normalY = (lastX - prevX)
-            val norm = sqrt( normalX * normalX + normalY * normalY)
-            if (norm < 0.1f) {
-                continue
-            }
-            normalX /= norm
-            normalY /= norm
-            contourPath.lineTo(lastX - normalX * mRadius, lastY - normalY * mRadius)
-
-            prevX = lastX
-            prevY = lastY
-            mPrevRadius = mRadius
-        }
-        contourPath.close()
-    }
-
-     */
-
-    fun finishLine() {
-        contourPath.rewind()
-        prevX = firstX
-        prevY = firstY
-        contourPath.moveTo(firstX, firstY)
-        mPathMeasure.setPath(spinePath, false)
-
-        val n = mDistanceRadius.size
-        var i = 0;
-        for (j in 0 until 2 * n- 1) {
-            i = j.coerceAtMost(2 * n - 1 - j)
-
-            mPathMeasure.getPosTan(mDistanceRadius[i].first, pos, null)
-            curX = pos[0]
-            curY = pos[1]
-            mRadius = mDistanceRadius[i].second
-
-            var normalX = -(curY - prevY)
-            var normalY = (curX - prevX)
-            val norm = sqrt( normalX * normalX + normalY * normalY)
-            if (norm < 0.1f) {
-                continue
-            }
-            normalX /= norm
-            normalY /= norm
-            contourPath.lineTo(curX - normalX * mRadius, curY - normalY * mRadius)
-
-            prevX = curX
-            prevY = curY
-            mPrevRadius = mRadius
-        }
-        contourPath.close()
-        contourPath
-    }
-
-
-
-
-    fun finalPath()  {
+    fun granularContour()  {
         val pathMeasure = PathMeasure(Path(spinePath), false)
         val path = Path()
 
@@ -227,8 +151,6 @@ class DynPath{
         prevX = pos[0]
         prevY = pos[1]
 
-        val pointArray = mutableListOf<Triple<Float, Float, Float>>()
-
         contourPath.rewind()
         contourPath.addCircle(firstX, firstY, mPrevRadius, mDirection)
 
@@ -237,7 +159,7 @@ class DynPath{
             //n = ceil ((cur.first - prev.first) / (3*minGapFactor * (prev.second + cur.second) / 2) ).toInt()
             delta = (cur.first - prev.first) / n
 
-            for (i in 0 until n) {
+            for (i in 1 .. n) {
                 curDist = prev.first + i * delta
                 mRadius = prev.second  + i * (cur.second - prev.second) / n
 
@@ -253,41 +175,6 @@ class DynPath{
         curY = pos[1]
         extendPath()
     }
-
-
-
-    /*
-    fun finishLine() {
-        contourPath = Path().apply { fillType = Path.FillType.WINDING }
-        prevX = firstX
-        prevY = firstY
-        contourPath.moveTo(firstX, firstY)
-        mPathMeasure = PathMeasure(spinePath, false)
-        for (point in mDistanceRadius) {
-
-            mPathMeasure.getPosTan(point.first, pos, null)
-            curX = pos[0]
-            curY = pos[1]
-            mRadius = point.second
-
-            var normalX = -(curY - prevY)
-            var normalY = (curX - prevX)
-            val norm = sqrt( normalX * normalX + normalY * normalY)
-            if (norm < 0.01f * mRadius) {
-                continue
-            }
-            normalX /= norm
-            normalY /= norm
-            contourPath.lineTo(curX - normalX * mRadius, curY - normalY * mRadius)
-
-            prevX = curX
-            prevY = curY
-            mPrevRadius = mRadius
-        }
-        contourPath.close()
-    }
-
-     */
 
 
 
@@ -406,15 +293,42 @@ class DynPath{
      */
 
 
-    companion object {
-        const val SMOOTHING_OFF = 0
-        const val SMOOTHING_WEAK = 1
-        const val SMOOTHING_NORMAL = 3
-        const val SMOOTHING_STRONG = 9
-        const val SMOOTHING_HUGE = 27
-        const val SMOOTHING_MAX = 81
+    fun convertToXYR(distanceArray: MutableList<Pair<Float, Float>>, path: Path, upscale: Int = 1, upsCaleOriginalArray: Boolean = false): MutableList<Triple<Float, Float, Float>>{
+        val arrXYR = mutableListOf<Triple<Float, Float, Float>>()
+        val arrDistRad = mutableListOf<Pair<Float, Float>>()
 
+        var prevDist = mDistanceRadius[0].first
+        var prevRadius = mDistanceRadius[0].second
+        mPathMeasure.getPosTan(prevDist, pos, null)
+        arrXYR.add(Triple(pos[0], pos[1], prevRadius))
+        arrDistRad.add(Pair(prevDist, prevRadius))
+
+        var nextDist: Float
+        var nextRadius: Float
+        var curDist: Float
+        var curRadius: Float
+
+        mPathMeasure.setPath(path, false)
+
+        for (pair in mDistanceRadius.drop(1)) {
+            nextDist = pair.first
+            nextRadius = pair.second
+            for (i in 1..upscale) {
+                curDist = prevDist + (nextDist - prevDist) * i / upscale
+                curRadius = prevRadius + (nextRadius - prevRadius) * i / upscale
+                mPathMeasure.getPosTan(curDist, pos, null)
+                arrXYR.add(Triple( pos[0], pos[1], curRadius))
+
+                if (upsCaleOriginalArray) {
+                    arrDistRad.add(Pair(curDist, curRadius))
+                }
+            }
+            prevDist = nextDist
+            prevRadius = nextRadius
+        }
+        return arrXYR
     }
+
 
 
 

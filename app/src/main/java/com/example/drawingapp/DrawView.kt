@@ -187,9 +187,9 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
             }
             MotionEvent.ACTION_UP -> {
 
-                mDynPath.quadSmooth(1)
+                mDynPath.quadSmooth(0)
                 //mDynPath.finalPath()
-                mDynPath.finishLine()
+                //mDynPath.finishLine()
                 mDynPath = DynPath()
                 drawingStarted = false
             }
@@ -254,7 +254,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
     private fun updatePaint(parameters: DrawingParameters) {
         mPaint.color = parameters.color
         //mPaint.strokeWidth = parameters.brushSize
-        mPaint.strokeWidth = 1f
+        mPaint.strokeWidth = 0.2f
         mPaint.alpha = (parameters.alpha * 255).toInt()
     }
 
