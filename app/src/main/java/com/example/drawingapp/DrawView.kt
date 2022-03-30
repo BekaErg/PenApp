@@ -45,7 +45,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
     private var mErasedIndices = arrayListOf<Int>()
     private var mPaint = Paint().apply {
         isAntiAlias = true
-        style = Paint.Style.STROKE
+        style = Paint.Style.FILL
         strokeWidth = 10f
         strokeJoin = Paint.Join.ROUND
         strokeCap = Paint.Cap.ROUND
@@ -187,9 +187,9 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
             }
             MotionEvent.ACTION_UP -> {
 
-                mDynPath.quadSmooth(0)
+                mDynPath.quadSmooth(1)
                 //mDynPath.finalPath()
-                //mDynPath.finishLine()
+                mDynPath.finishLine()
                 mDynPath = DynPath()
                 drawingStarted = false
             }

@@ -23,12 +23,15 @@ class DynPath{
     var leftPath = Path()
     var rightPath = Path()
 
-    val gapFactor = 0.1f
+    val gapFactor = 0.4f
 
     var normalX = 0f
     var normalY = 0f
     var norm = 1f
 
+    private var discardedX = 0f
+    private var discardedY = 0f
+    private var discardedRadius = 0f
 
     private val pos = floatArrayOf(0f, 0f)
     private val tan = floatArrayOf(0f, 0f)
@@ -44,22 +47,18 @@ class DynPath{
     var tempPath = Path().apply { fillType = Path.FillType.WINDING }
 
 
-    private var mKeyPoints = mutableListOf<Triple<Float, Float, Float>>()
     private var mDistanceRadius = mutableListOf<Pair<Float, Float>>()
     private var mPathMeasure = PathMeasure()
 
-
+    private var smoothLevel = 0
 
     fun moveTo(x: Float, y: Float, radius: Float) {
-        mKeyPoints.add(Triple(x,y, radius))
         mDistanceRadius.add(Pair(0f, radius))
 
         spinePath.moveTo(x,y)
-        leftPath.moveTo(x,y)
-        rightPath.moveTo(x,y)
         contourPath.addCircle(x, y, radius, mDirection)
-
         mPrevRadius = radius
+
         prevX = x
         prevY = y
         firstX = x
@@ -68,15 +67,18 @@ class DynPath{
     }
 
     fun lineTo(x: Float, y: Float, radius: Float) {
-        if( (x - prevX).absoluteValue < gapFactor * radius && (y - prevY).absoluteValue < gapFactor * radius) {
+        if( (x - prevX).absoluteValue < minGapFactor * radius && (y - prevY).absoluteValue < minGapFactor * radius) {
+            discardedX = x
+            discardedY = y
+            discardedRadius = radius
             return
         }
+        discardedRadius = 0f
 
         spinePath.lineTo(x,y)
         mPathMeasure = PathMeasure(spinePath, false)
         mPathMeasure.getPosTan(mPathMeasure.length, pos, tan)
 
-        mKeyPoints.add(Triple(x,y, radius))
         mDistanceRadius.add(Pair(mPathMeasure.length, radius))
 
 
@@ -90,6 +92,10 @@ class DynPath{
 
     fun draw(canvas: Canvas, paint: Paint) {
         canvas.drawPath(contourPath, paint)
+        if (discardedRadius != 0f) {
+            canvas.drawCircle(discardedX, discardedY, discardedRadius, paint)
+        }
+
     }
 
     fun drawSpine(canvas: Canvas, paint: Paint) {
@@ -103,12 +109,10 @@ class DynPath{
     private fun rewind() {
         spinePath.rewind()
         contourPath.rewind()
-        mKeyPoints.clear()
     }
 
     fun restart() {
         rewind()
-
         this.moveTo(firstX, firstY, firstRad)
     }
 
@@ -150,6 +154,42 @@ class DynPath{
 
      */
 
+    fun finishLine() {
+        contourPath.rewind()
+        prevX = firstX
+        prevY = firstY
+        contourPath.moveTo(firstX, firstY)
+        mPathMeasure.setPath(spinePath, false)
+
+        val n = mDistanceRadius.size
+        var i = 0;
+        for (j in 0 until 2 * n- 1) {
+            i = j.coerceAtMost(2 * n - 1 - j)
+
+            mPathMeasure.getPosTan(mDistanceRadius[i].first, pos, null)
+            curX = pos[0]
+            curY = pos[1]
+            mRadius = mDistanceRadius[i].second
+
+            var normalX = -(curY - prevY)
+            var normalY = (curX - prevX)
+            val norm = sqrt( normalX * normalX + normalY * normalY)
+            if (norm < 0.1f) {
+                continue
+            }
+            normalX /= norm
+            normalY /= norm
+            contourPath.lineTo(curX - normalX * mRadius, curY - normalY * mRadius)
+
+            prevX = curX
+            prevY = curY
+            mPrevRadius = mRadius
+        }
+        contourPath.close()
+        contourPath
+    }
+
+
 
 
     fun finalPath()  {
@@ -160,12 +200,8 @@ class DynPath{
         var curRad = 0f
         var n = 0
         var delta = 0f
-        var counter = 0
+
         for ((prev,cur) in mDistanceRadius.zip(mDistanceRadius.drop(1))) {
-            //pathMeasure.getPosTan(prev.first,  pos, tan)
-            //path.addCircle(pos[0], pos[1], 10*prev.second, Path.Direction.CCW)
-            //Log.i("gela", "dist: ${prev.first}     rad ${prev.second}")
-            counter += 1
             n = ceil ((cur.first - prev.first) / (gapFactor * (prev.second + cur.second)) ).toInt()
             delta = (cur.first - prev.first) / n
             for (i in 0 until n) {
@@ -175,26 +211,64 @@ class DynPath{
                 path.addCircle(pos[0], pos[1], curRad, Path.Direction.CCW)
             }
         }
-
         contourPath = path
-        /*
-        spinePath.addCircle(curX, curY, mRadius, Path.Direction.CCW)
-        Log.i("gela", "posX: ${pos[0]}     posY${pos[1]}")
-        Log.i("gela", "${pathMeasure.length}   ")
-         */
     }
 
 
+    private fun updateContour()  {
+        var curDist = 0f
+        var n = 0
+        var delta = 0f
+
+        val pathMeasure = PathMeasure(Path(spinePath), false)
+        pathMeasure.getPosTan(0f,  pos, null)
+
+        mPrevRadius = mDistanceRadius[0].second
+        prevX = pos[0]
+        prevY = pos[1]
+
+        val pointArray = mutableListOf<Triple<Float, Float, Float>>()
+
+        contourPath.rewind()
+        contourPath.addCircle(firstX, firstY, mPrevRadius, mDirection)
+
+        for ((prev,cur) in mDistanceRadius.zip(mDistanceRadius.drop(1))) {
+            n = smoothLevel
+            //n = ceil ((cur.first - prev.first) / (3*minGapFactor * (prev.second + cur.second) / 2) ).toInt()
+            delta = (cur.first - prev.first) / n
+
+            for (i in 0 until n) {
+                curDist = prev.first + i * delta
+                mRadius = prev.second  + i * (cur.second - prev.second) / n
+
+                pathMeasure.getPosTan(curDist,  pos, tan)
+                curX = pos[0]
+                curY = pos[1]
+                extendPath()
+            }
+        }
+        pathMeasure.getPosTan(pathMeasure.length,  pos, tan)
+        mRadius = mDistanceRadius.last().second
+        curX = pos[0]
+        curY = pos[1]
+        extendPath()
+    }
+
+
+
+    /*
     fun finishLine() {
         contourPath = Path().apply { fillType = Path.FillType.WINDING }
         prevX = firstX
         prevY = firstY
         contourPath.moveTo(firstX, firstY)
+        mPathMeasure = PathMeasure(spinePath, false)
+        for (point in mDistanceRadius) {
 
-        for (point in mKeyPoints) {
-            curX = point.first
-            curY = point.second
-            mRadius = point.third
+            mPathMeasure.getPosTan(point.first, pos, null)
+            curX = pos[0]
+            curY = pos[1]
+            mRadius = point.second
 
             var normalX = -(curY - prevY)
             var normalY = (curX - prevX)
@@ -213,67 +287,71 @@ class DynPath{
         contourPath.close()
     }
 
+     */
+
 
 
 
     fun quadSmooth(level: Int) {
+        val n = mDistanceRadius.size
         if (level <= 0) {
             return
         }
-        val n = mKeyPoints.size
-        contourPath = Path().apply { fillType = Path.FillType.WINDING }
-        prevX = firstX
-        prevY = firstY
+        smoothLevel = level
 
+
+        val newArr = mutableListOf<Pair<Float, Float>>()
+        val newMeasure = PathMeasure()
+        val curPos = floatArrayOf(0f, 0f)
+        val nextPos = floatArrayOf(0f, 0f)
+
+        mPathMeasure.getPosTan(mDistanceRadius[0].first, curPos, null)
+        newArr.add(Pair (mDistanceRadius[0].first, mDistanceRadius[0].second) )
+
+        contourPath.rewind()
+        mPathMeasure = PathMeasure(spinePath, false)
         spinePath.rewind()
-        spinePath.moveTo(prevX, prevY)
+        spinePath.moveTo(curPos[0], curPos[1])
 
         for (i in level until n step level) {
             if (i < n - level){
-                curX = (mKeyPoints[i].first + mKeyPoints[i + level].first) / 2
-                curY = (mKeyPoints[i].second + mKeyPoints[i + level].second) / 2
+                mPathMeasure.getPosTan(mDistanceRadius[i].first, curPos, null)
+                mPathMeasure.getPosTan(mDistanceRadius[i + level].first, nextPos, null)
+                curX = (curPos[0] + nextPos[0]) / 2
+                curY = (curPos[1] + nextPos[1]) / 2
             } else {
-                curX = mKeyPoints[n - 1].first
-                curY = mKeyPoints[n - 1].second
+                mPathMeasure.getPosTan(mDistanceRadius[i].first, curPos, null)
+                mPathMeasure.getPosTan(mDistanceRadius[n - 1].first, nextPos, null)
+                curX = nextPos[0]
+                curY = nextPos[1]
             }
-            spinePath.quadTo(mKeyPoints[i].first, mKeyPoints[i].second, curX, curY)
-            prevX = curX
-            prevY = curY
-            mPrevRadius = mRadius
+            spinePath.quadTo(curPos[0], curPos[1], curX, curY)
+
+            mRadius = (mDistanceRadius[i].second + mDistanceRadius[(i + level).coerceAtMost(n - 1)].second) / 2
+            newMeasure.setPath(spinePath, false)
+            newArr.add(Pair(newMeasure.length, mRadius) )
+
         }
-        spinePath.quadTo(mKeyPoints[n - 1].first, mKeyPoints[n - 1].second, curX, curY)
+        if (newArr.size == 1) {
+            mPathMeasure.getPosTan(mDistanceRadius[n - 1].first, nextPos, null)
+            spinePath.quadTo(nextPos[0], nextPos[1], nextPos[0], nextPos[1])
+
+            mRadius = mDistanceRadius[n - 1].second
+            newArr.add(Pair(newMeasure.length, mRadius) )
+        }
+        mDistanceRadius = newArr
+        updateContour()
     }
 
-    private fun extendPath2(){
-        var normalX = -(curY - prevY)
-        var normalY = (curX - prevX)
-        val norm = sqrt( normalX * normalX + normalY * normalY)
-        if (norm > mRadius /5000f) {
-            normalX /= norm
-            normalY /= norm
-            contourPath.moveTo(prevX - normalX * mPrevRadius, prevY - normalY * mPrevRadius)
-            contourPath.lineTo(prevX + normalX * mPrevRadius, prevY + normalY * mPrevRadius)
-            contourPath.lineTo(curX + normalX * mRadius, curY + normalY * mRadius)
-            contourPath.lineTo(curX - normalX * mRadius, curY - normalY * mRadius)
-            contourPath.close()
-        } else if (norm < mRadius / 20f + 10f) {
-            return
-        }
-
-        contourPath.addCircle(curX, curY, mRadius, mDirection)
-        prevX = curX
-        prevY = curY
-        mPrevRadius = mRadius
-    }
 
 
 
 
     private fun extendPath(){
-        var normalX = -(tan[1])
-        var normalY = (tan[0])
+        var normalX = -(curY - prevY)
+        var normalY = (curX - prevX)
         val norm = sqrt( normalX * normalX + normalY * normalY)
-        if (norm > mRadius /5000f) {
+        if (norm > mRadius * minGapFactor * 0.2) {
             normalX /= norm
             normalY /= norm
             contourPath.moveTo(prevX - normalX * mPrevRadius, prevY - normalY * mPrevRadius)
@@ -281,23 +359,11 @@ class DynPath{
             contourPath.lineTo(curX + normalX * mRadius, curY + normalY * mRadius)
             contourPath.lineTo(curX - normalX * mRadius, curY - normalY * mRadius)
             contourPath.close()
-        } else if (norm < mRadius / 20f + 10f) {
+        } else if (false && norm < mRadius / 200f + 10f) {
             return
         }
 
-/*
-        leftPath.lineTo(lastX - normalX * mRadius, lastY - normalY * mRadius)
-        rightPath.lineTo(lastX + normalX * mRadius, lastY + normalY * mRadius)
- */
-
-
-        //contourPath.moveTo(prevX - 1f * mPrevRadius, prevY - normalY * mPrevRadius)
-        //contourPath.lineTo(lastX + 1f * mRadius, lastY + 2f * mRadius)
-        //contourPath.addPath(tempPath)
         contourPath.addCircle(curX, curY, mRadius, mDirection)
-        //mTempPath.addCircle(mCurTouchX, mCurTouchY, mCurStrokeRadius, Path.Direction.CW)
-        //mTempPath.op(p, Path.Op.UNION)
-
         prevX = curX
         prevY = curY
         mPrevRadius = mRadius
