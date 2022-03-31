@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.*
 import android.graphics.drawable.PictureDrawable
 import android.util.AttributeSet
+import android.util.Log
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.ScaleGestureDetector.SimpleOnScaleGestureListener
@@ -45,7 +46,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
     private var mErasedIndices = arrayListOf<Int>()
     private var mPaint = Paint().apply {
         isAntiAlias = true
-        style = Paint.Style.FILL
+        style = Paint.Style.STROKE
         strokeWidth = 10f
         strokeJoin = Paint.Join.ROUND
         strokeCap = Paint.Cap.ROUND
@@ -189,6 +190,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
             MotionEvent.ACTION_UP -> {
 
                 mDynPath.quadSmooth(0)
+                mDynPath.updateContour()
                 //mDynPath.finalPath()
                 //mDynPath.finishLine()
                 mDynPath = DynPath()

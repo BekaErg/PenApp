@@ -1,33 +1,22 @@
 package com.example.drawingapp
 
 import android.graphics.*
-import android.util.Log
-import java.util.*
 import kotlin.math.*
 
 
 class DynPath{
-
-    var curX = 0f
-    var prevX = 0f
-    var curY = 0f
-    var prevY = 0f
-
-    var firstX = 0f
-    var firstY = 0f
-    var firstRad = 0f
-
     private val minGapFactor = 0.2f
 
-    var leftPath = Path()
-    var rightPath = Path()
-
-    val gapFactor = 0.4f
-
-    var normalX = 0f
-    var normalY = 0f
-    var norm = 1f
-
+    private var curX = 0f
+    private var prevX = 0f
+    private var curY = 0f
+    private var prevY = 0f
+    private var firstX = 0f
+    private var firstY = 0f
+    private var firstRad = 0f
+    private var norm = 1f
+    private var mRadius = 0f
+    private var mPrevRadius = 0f
     private var discardedX = 0f
     private var discardedY = 0f
     private var discardedRadius = 0f
@@ -35,27 +24,18 @@ class DynPath{
     private val pos = floatArrayOf(0f, 0f)
     private val tan = floatArrayOf(0f, 0f)
 
-    private var mRadius = 0f
-    private var mPrevRadius = 0f
-    private var mDirection = Path.Direction.CCW
-
-
     var contourPath = Path()
-    private var spinePath = Path().apply { fillType = Path.FillType.WINDING }
-    var pathMeasrure = PathMeasure(spinePath, false)
-    var tempPath = Path().apply { fillType = Path.FillType.WINDING }
-
-
-    private var mDistanceRadius = mutableListOf<Pair<Float, Float>>()
+    var spinePath = Path().apply { fillType = Path.FillType.WINDING }
     private var mPathMeasure = PathMeasure()
+    private var mDistanceRadius = mutableListOf<Pair<Float, Float>>()
 
-    private var smoothLevel = 0
+    private var smoothLevel = 1
 
     fun moveTo(x: Float, y: Float, radius: Float) {
         mDistanceRadius.add(Pair(0f, radius))
 
         spinePath.moveTo(x,y)
-        contourPath.addCircle(x, y, radius, mDirection)
+        contourPath.addCircle(x, y, radius, Path.Direction.CCW)
         mPrevRadius = radius
 
         prevX = x
@@ -66,7 +46,8 @@ class DynPath{
     }
 
     fun lineTo(x: Float, y: Float, radius: Float) {
-        if( (x - prevX).absoluteValue < minGapFactor * radius && (y - prevY).absoluteValue < minGapFactor * radius) {
+        norm = sqrt((x - prevX) * (x - prevX) + (y - prevY) * (y - prevY))
+        if (norm < minGapFactor * radius) {
             discardedX = x
             discardedY = y
             discardedRadius = radius
@@ -77,17 +58,13 @@ class DynPath{
         spinePath.lineTo(x,y)
         mPathMeasure = PathMeasure(spinePath, false)
         mPathMeasure.getPosTan(mPathMeasure.length, pos, tan)
-
         mDistanceRadius.add(Pair(mPathMeasure.length, radius))
-
 
         curX = x
         curY = y
         mRadius = radius
-
-        extendPath()
+        extendContour()
     }
-
 
     fun draw(canvas: Canvas, paint: Paint) {
         canvas.drawPath(contourPath, paint)
@@ -99,15 +76,12 @@ class DynPath{
 
     fun drawSpine(canvas: Canvas, paint: Paint) {
         canvas.drawPath(spinePath, paint)
-
-        //canvas.drawPath(leftPath, paint)
-        //canvas.drawPath(rightPath, paint)
     }
-
 
     private fun rewind() {
         spinePath.rewind()
         contourPath.rewind()
+        mDistanceRadius.clear()
     }
 
     fun restart() {
@@ -115,34 +89,10 @@ class DynPath{
         this.moveTo(firstX, firstY, firstRad)
     }
 
-    fun granularContour()  {
-        val pathMeasure = PathMeasure(Path(spinePath), false)
-        val path = Path()
-
-        var curDist = 0f
-        var curRad = 0f
-        var n = 0
-        var delta = 0f
-
-        for ((prev,cur) in mDistanceRadius.zip(mDistanceRadius.drop(1))) {
-            n = ceil ((cur.first - prev.first) / (gapFactor * (prev.second + cur.second)) ).toInt()
-            delta = (cur.first - prev.first) / n
-            for (i in 0 until n) {
-                curDist = prev.first + i*delta
-                curRad = prev.second  + i * (cur.second - prev.second) / n
-                pathMeasure.getPosTan(curDist,  pos, tan)
-                path.addCircle(pos[0], pos[1], curRad, Path.Direction.CCW)
-            }
-        }
-        contourPath = path
-    }
-
-
-    private fun updateContour()  {
+    fun updateContour()  {
         var curDist = 0f
         var n = 0
         var delta = 0f
-
         val pathMeasure = PathMeasure(Path(spinePath), false)
         pathMeasure.getPosTan(0f,  pos, null)
 
@@ -151,7 +101,7 @@ class DynPath{
         prevY = pos[1]
 
         contourPath.rewind()
-        contourPath.addCircle(firstX, firstY, mPrevRadius, mDirection)
+        contourPath.addCircle(firstX, firstY, mPrevRadius, Path.Direction.CCW)
 
         for ((prev,cur) in mDistanceRadius.zip(mDistanceRadius.drop(1))) {
             n = smoothLevel
@@ -160,42 +110,38 @@ class DynPath{
 
             for (i in 1 .. n) {
                 curDist = prev.first + i * delta
-                mRadius = prev.second  + i * (cur.second - prev.second) / n
+                mRadius = prev.second + i * (cur.second - prev.second) / n
 
-                pathMeasure.getPosTan(curDist,  pos, tan)
+                pathMeasure.getPosTan(curDist, pos, tan)
                 curX = pos[0]
                 curY = pos[1]
-                extendPath()
+                norm = sqrt((curX - prevX) * (curX - prevX) + (curY - prevY) * (curY - prevY))
+                extendContour()
             }
         }
         pathMeasure.getPosTan(pathMeasure.length,  pos, tan)
         mRadius = mDistanceRadius.last().second
         curX = pos[0]
         curY = pos[1]
-        extendPath()
+        extendContour()
     }
 
-
-
-
     fun quadSmooth(level: Int) {
-        val n = mDistanceRadius.size
         if (level <= 0) {
             return
         }
         smoothLevel = level
-
-
+        val n = mDistanceRadius.size
         val newArr = mutableListOf<Pair<Float, Float>>()
         val newMeasure = PathMeasure()
         val curPos = floatArrayOf(0f, 0f)
         val nextPos = floatArrayOf(0f, 0f)
 
+        mPathMeasure = PathMeasure(spinePath, false)
         mPathMeasure.getPosTan(mDistanceRadius[0].first, curPos, null)
         newArr.add(Pair (mDistanceRadius[0].first, mDistanceRadius[0].second) )
 
         contourPath.rewind()
-        mPathMeasure = PathMeasure(spinePath, false)
         spinePath.rewind()
         spinePath.moveTo(curPos[0], curPos[1])
 
@@ -212,7 +158,6 @@ class DynPath{
                 curY = nextPos[1]
             }
             spinePath.quadTo(curPos[0], curPos[1], curX, curY)
-
             mRadius = (mDistanceRadius[i].second + mDistanceRadius[(i + level).coerceAtMost(n - 1)].second) / 2
             newMeasure.setPath(spinePath, false)
             newArr.add(Pair(newMeasure.length, mRadius) )
@@ -229,64 +174,28 @@ class DynPath{
         updateContour()
     }
 
-
-    private var matrix = Matrix()
-
-
-    private fun extendPath(){
-        val v = PointF (curX - prevX, curY - prevY)
-        val norm = v.length()
-
-        v.x /= norm
-        v.y /= norm
-
+    private fun extendContour(){
         val cosTheta = - (mRadius - mPrevRadius) / norm
         val sinTheta = sqrt( 1 - cosTheta * cosTheta)
 
-        val leftUnitVec = PointF(v.x * cosTheta + v.y * sinTheta, -v.x * sinTheta + v.y * cosTheta )
-        val rightUnitVec = PointF(v.x * cosTheta - v.y * sinTheta, v.x * sinTheta + v.y * cosTheta )
+        val leftUnitX = tan[0] * cosTheta + tan[1] * sinTheta
+        val leftUnitY = -tan[0] * sinTheta + tan[1] * cosTheta
+        val rightUnitX = tan[0] * cosTheta - tan[1] * sinTheta
+        val rightUnitY = tan[0] * sinTheta + tan[1] * cosTheta
 
         if (norm > mRadius * minGapFactor * 0.2 && norm > (mRadius - mPrevRadius).absoluteValue ) {
-            normalX /= norm
-            normalY /= norm
-            contourPath.moveTo(prevX + leftUnitVec.x * mPrevRadius, prevY + leftUnitVec.y * mPrevRadius)
-            contourPath.lineTo(prevX + rightUnitVec.x * mPrevRadius, prevY + rightUnitVec.y * mPrevRadius)
-            contourPath.lineTo(curX + rightUnitVec.x * mRadius, curY + rightUnitVec.y * mRadius)
-            contourPath.lineTo(curX + leftUnitVec.x * mRadius, curY + leftUnitVec.y * mRadius)
+            contourPath.moveTo(prevX + leftUnitX * mPrevRadius, prevY + leftUnitY * mPrevRadius)
+            contourPath.lineTo(prevX + rightUnitX * mPrevRadius, prevY + rightUnitY * mPrevRadius)
+            contourPath.lineTo(curX + rightUnitX * mRadius, curY + rightUnitY * mRadius)
+            contourPath.lineTo(curX + leftUnitX * mRadius, curY + leftUnitY * mRadius)
             contourPath.close()
-        } else if (false && norm < mRadius / 200f + 10f) {
-            return
         }
 
-        contourPath.addCircle(curX, curY, mRadius, mDirection)
+        contourPath.addCircle(curX, curY, mRadius, Path.Direction.CCW)
         prevX = curX
         prevY = curY
         mPrevRadius = mRadius
     }
-
-    /*
-    private fun extendPath(){
-        var normalX = -(curY - prevY)
-        var normalY = (curX - prevX)
-        val norm = sqrt( normalX * normalX + normalY * normalY)
-        if (norm > mRadius * minGapFactor * 0.2) {
-            normalX /= norm
-            normalY /= norm
-            contourPath.moveTo(prevX - normalX * mPrevRadius, prevY - normalY * mPrevRadius)
-            contourPath.lineTo(prevX + normalX * mPrevRadius, prevY + normalY * mPrevRadius)
-            contourPath.lineTo(curX + normalX * mRadius, curY + normalY * mRadius)
-            contourPath.lineTo(curX - normalX * mRadius, curY - normalY * mRadius)
-            contourPath.close()
-        } else if (false && norm < mRadius / 200f + 10f) {
-            return
-        }
-
-        contourPath.addCircle(curX, curY, mRadius, mDirection)
-        prevX = curX
-        prevY = curY
-        mPrevRadius = mRadius
-    }
-     */
 
 
     fun convertToXYR(distanceArray: MutableList<Pair<Float, Float>>, path: Path, upscale: Int = 1, upsCaleOriginalArray: Boolean = false): MutableList<Triple<Float, Float, Float>>{
@@ -325,19 +234,26 @@ class DynPath{
         return arrXYR
     }
 
+    fun granularContour()  {
+        val pathMeasure = PathMeasure(Path(spinePath), false)
+        val path = Path()
 
+        var curDist = 0f
+        var curRad = 0f
+        var n = 0
+        var delta = 0f
 
-
-}
-
-/*
-    private fun gapIsTooSmall(): Boolean {
-        mGap = mEpsilon * mCurStrokeRadius
-        return mCurTouchX - mPrevTouchX < mGap && mCurTouchY - mPrevTouchY < mGap && mPrevTouchX - mCurTouchX < mGap && mPrevTouchY - mCurTouchY < mGap
+        for ((prev,cur) in mDistanceRadius.zip(mDistanceRadius.drop(1))) {
+            n = ceil ((cur.first - prev.first) / (minGapFactor * (prev.second + cur.second)) ).toInt()
+            delta = (cur.first - prev.first) / n
+            for (i in 0 until n) {
+                curDist = prev.first + i*delta
+                curRad = prev.second  + i * (cur.second - prev.second) / n
+                pathMeasure.getPosTan(curDist,  pos, tan)
+                path.addCircle(pos[0], pos[1], curRad, Path.Direction.CCW)
+            }
+        }
+        contourPath = path
     }
 
-    dash.rewind()
-        dash.addCircle(0f,0f, mRadius, Path.Direction.CCW)
-        paint.pathEffect = PathDashPathEffect(dash, 2*mRadius, 2f,
-            PathDashPathEffect.Style.MORPH)
- */
+}
