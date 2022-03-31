@@ -149,6 +149,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
             }
             MotionEvent.ACTION_MOVE -> {
                 mDynPath.restart()
+                applyPressure(event.getPressure(0))
                 mDynPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
             }
             MotionEvent.ACTION_UP -> {
@@ -248,7 +249,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
 
     private fun applyPressure(pressure: Float) {
         //mCurStrokeRadius = 0.5f * strokeSize * (1f - (1f - pressure).pow(2))
-        mCurStrokeRadius = 0.001f * strokeSize + 0.499f * strokeSize * (1f - (1f - pressure).pow(2))
+        mCurStrokeRadius = 0.000f * strokeSize + 0.500f * strokeSize * (1f - (1f - pressure).pow(2))
     }
 
     private fun updatePaint(parameters: DrawingParameters) {

@@ -2,9 +2,8 @@ package com.example.drawingapp
 
 import android.graphics.*
 import android.util.Log
-import kotlin.math.absoluteValue
-import kotlin.math.ceil
-import kotlin.math.sqrt
+import java.util.*
+import kotlin.math.*
 
 
 class DynPath{
@@ -18,7 +17,7 @@ class DynPath{
     var firstY = 0f
     var firstRad = 0f
 
-    private val minGapFactor = 0.1f
+    private val minGapFactor = 0.2f
 
     var leftPath = Path()
     var rightPath = Path()
@@ -231,9 +230,41 @@ class DynPath{
     }
 
 
+    private var matrix = Matrix()
 
 
+    private fun extendPath(){
+        val v = PointF (curX - prevX, curY - prevY)
+        val norm = v.length()
 
+        v.x /= norm
+        v.y /= norm
+
+        val cosTheta = - (mRadius - mPrevRadius) / norm
+        val sinTheta = sqrt( 1 - cosTheta * cosTheta)
+
+        val leftUnitVec = PointF(v.x * cosTheta + v.y * sinTheta, -v.x * sinTheta + v.y * cosTheta )
+        val rightUnitVec = PointF(v.x * cosTheta - v.y * sinTheta, v.x * sinTheta + v.y * cosTheta )
+
+        if (norm > mRadius * minGapFactor * 0.2 && norm > (mRadius - mPrevRadius).absoluteValue ) {
+            normalX /= norm
+            normalY /= norm
+            contourPath.moveTo(prevX + leftUnitVec.x * mPrevRadius, prevY + leftUnitVec.y * mPrevRadius)
+            contourPath.lineTo(prevX + rightUnitVec.x * mPrevRadius, prevY + rightUnitVec.y * mPrevRadius)
+            contourPath.lineTo(curX + rightUnitVec.x * mRadius, curY + rightUnitVec.y * mRadius)
+            contourPath.lineTo(curX + leftUnitVec.x * mRadius, curY + leftUnitVec.y * mRadius)
+            contourPath.close()
+        } else if (false && norm < mRadius / 200f + 10f) {
+            return
+        }
+
+        contourPath.addCircle(curX, curY, mRadius, mDirection)
+        prevX = curX
+        prevY = curY
+        mPrevRadius = mRadius
+    }
+
+    /*
     private fun extendPath(){
         var normalX = -(curY - prevY)
         var normalY = (curX - prevX)
@@ -251,41 +282,6 @@ class DynPath{
         }
 
         contourPath.addCircle(curX, curY, mRadius, mDirection)
-        prevX = curX
-        prevY = curY
-        mPrevRadius = mRadius
-    }
-
-    /*
-        private fun extendPath(){
-        var normalX = -(curY - prevY)
-        var normalY = (curX - prevX)
-        val norm = sqrt( normalX * normalX + normalY * normalY)
-        if (norm > mRadius /5000f) {
-            normalX /= norm
-            normalY /= norm
-            contourPath.moveTo(prevX - normalX * mPrevRadius, prevY - normalY * mPrevRadius)
-            contourPath.lineTo(prevX + normalX * mPrevRadius, prevY + normalY * mPrevRadius)
-            contourPath.lineTo(curX + normalX * mRadius, curY + normalY * mRadius)
-            contourPath.lineTo(curX - normalX * mRadius, curY - normalY * mRadius)
-            contourPath.close()
-        } else if (norm < mRadius / 20f + 10f) {
-            return
-        }
-
-/*
-        leftPath.lineTo(lastX - normalX * mRadius, lastY - normalY * mRadius)
-        rightPath.lineTo(lastX + normalX * mRadius, lastY + normalY * mRadius)
- */
-
-
-        //contourPath.moveTo(prevX - 1f * mPrevRadius, prevY - normalY * mPrevRadius)
-        //contourPath.lineTo(lastX + 1f * mRadius, lastY + 2f * mRadius)
-        //contourPath.addPath(tempPath)
-        contourPath.addCircle(curX, curY, mRadius, mDirection)
-        //mTempPath.addCircle(mCurTouchX, mCurTouchY, mCurStrokeRadius, Path.Direction.CW)
-        //mTempPath.op(p, Path.Op.UNION)
-
         prevX = curX
         prevY = curY
         mPrevRadius = mRadius
