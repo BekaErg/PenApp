@@ -9,7 +9,7 @@ import android.widget.Toast
 
 open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : LinearLayout(context, attrs)  {
 
-    var lockZoom = true
+    var lockZoom = false
     private var mScaleDetector = ScaleGestureDetector(context, ScaleListener())
     private var mScale = 1f
     private var mScaleFactor = 1f
@@ -37,14 +37,6 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
 
 
 /*
-    override fun onDraw(canvas : Canvas) {
-        canvas.save();
-        canvas.translate(mTransX + mdX, mTransY + mdY);
-        canvas.scale(mScaleFactor, mScaleFactor, mPivotX, mPivotY)
-        super.onDraw(canvas);
-        canvas.restore();
-    }
-
     override fun onLayout(changed : Boolean, l : Int, t : Int, r : Int, b : Int) {
         val childCount = childCount
         for (i in 0 until childCount) {
@@ -67,13 +59,12 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
         child.translationY = mTransY
         child.scaleX = mScale
         child.scaleY = mScale
-
         child.invalidate()
         return super.drawChild(canvas, child, drawingTime)
     }
 
-    override fun onInterceptTouchEvent(ev : MotionEvent) : Boolean {
 
+    override fun onInterceptTouchEvent(ev : MotionEvent) : Boolean {
         if (ev.action and ev.actionMasked == MotionEvent.ACTION_DOWN && ev.getToolType(0) == MotionEvent.TOOL_TYPE_FINGER) {
             //Toast.makeText(context, "Action Down outside", Toast.LENGTH_SHORT).show()
             //Toast.makeText(context, "CenterX: $mCenterX  TransX: $mTransX  PivotX: $mPivotX", Toast.LENGTH_SHORT).show()
@@ -87,8 +78,7 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
             mLastTimeClick = System.currentTimeMillis()
         }
 
-        mPointerCount = ev.pointerCount
-        return if (mPointerCount == 2 && ev.getToolType(0) == MotionEvent.TOOL_TYPE_FINGER) {
+        return if (ev.pointerCount == 2 && ev.getToolType(0) == MotionEvent.TOOL_TYPE_FINGER) {
             //Toast.makeText(context, "Double down outside", Toast.LENGTH_SHORT).show()
             true
         } else {
@@ -103,7 +93,7 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
         //if Pressed outside child View, here we end up after child ontouchview
 
         mPointerCount = event.pointerCount
-        if (mPointerCount  <= 1 ) {
+        if (mPointerCount  <= 1 || event.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS) {
             return false
         }
         mCurX = event.getX(0)
@@ -148,12 +138,12 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
             //mPivotY = detector.focusY
 
             mScaleFactor = detector.scaleFactor
-            mScaleFactor = (0.3f / mScale).coerceAtLeast(mScaleFactor.coerceAtMost(5.0f / mScale))
+            mScaleFactor = (0.3f / mScale).coerceAtLeast(mScaleFactor.coerceAtMost(20.0f / mScale))
 
             mScale *= mScaleFactor
 
             // Don't let the object get too small or too large.
-            mScale = 0.3f.coerceAtLeast(mScale.coerceAtMost(5.0f))
+            mScale = 0.3f.coerceAtLeast(mScale.coerceAtMost(20.0f))
             invalidate()
             return true
         }

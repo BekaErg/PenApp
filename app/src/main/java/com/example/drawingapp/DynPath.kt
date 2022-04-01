@@ -5,7 +5,7 @@ import kotlin.math.*
 
 
 class DynPath{
-    private val minGapFactor = 0.2f
+    private val minGapFactor = 0.02f
 
     private var curX = 0f
     private var prevX = 0f
@@ -25,7 +25,7 @@ class DynPath{
     private val tan = floatArrayOf(0f, 0f)
 
     var contourPath = Path()
-    var spinePath = Path().apply { fillType = Path.FillType.WINDING }
+    var spinePath = Path().apply { fillType = Path.FillType.WINDING}
     private var mPathMeasure = PathMeasure()
     private var mDistanceRadius = mutableListOf<Pair<Float, Float>>()
 
@@ -47,16 +47,16 @@ class DynPath{
 
     fun lineTo(x: Float, y: Float, radius: Float) {
         norm = sqrt((x - prevX) * (x - prevX) + (y - prevY) * (y - prevY))
+        discardedX = x
+        discardedY = y
+        discardedRadius = radius
         if (norm < minGapFactor * radius) {
-            discardedX = x
-            discardedY = y
-            discardedRadius = radius
             return
         }
-        discardedRadius = 0f
+        //discardedRadius = 0f
 
         spinePath.lineTo(x,y)
-        mPathMeasure = PathMeasure(spinePath, false)
+        mPathMeasure.setPath(spinePath, false)
         mPathMeasure.getPosTan(mPathMeasure.length, pos, tan)
         mDistanceRadius.add(Pair(mPathMeasure.length, radius))
 
@@ -68,9 +68,9 @@ class DynPath{
 
     fun draw(canvas: Canvas, paint: Paint) {
         canvas.drawPath(contourPath, paint)
-        if (discardedRadius != 0f) {
-            canvas.drawCircle(discardedX, discardedY, discardedRadius, paint)
-        }
+        //TODO fix transparent brush issue
+        canvas.drawCircle(discardedX, discardedY, discardedRadius, paint)
+        discardedRadius = 0f
 
     }
 
@@ -78,10 +78,11 @@ class DynPath{
         canvas.drawPath(spinePath, paint)
     }
 
-    private fun rewind() {
+    fun rewind() {
         spinePath.rewind()
         contourPath.rewind()
         mDistanceRadius.clear()
+        mPrevRadius = 0f
     }
 
     fun restart() {
@@ -99,7 +100,6 @@ class DynPath{
         mPrevRadius = mDistanceRadius[0].second
         prevX = pos[0]
         prevY = pos[1]
-
         contourPath.rewind()
         contourPath.addCircle(firstX, firstY, mPrevRadius, Path.Direction.CCW)
 
@@ -107,11 +107,9 @@ class DynPath{
             n = smoothLevel
             //n = ceil ((cur.first - prev.first) / (3*minGapFactor * (prev.second + cur.second) / 2) ).toInt()
             delta = (cur.first - prev.first) / n
-
             for (i in 1 .. n) {
                 curDist = prev.first + i * delta
                 mRadius = prev.second + i * (cur.second - prev.second) / n
-
                 pathMeasure.getPosTan(curDist, pos, tan)
                 curX = pos[0]
                 curY = pos[1]
@@ -119,11 +117,32 @@ class DynPath{
                 extendContour()
             }
         }
-        pathMeasure.getPosTan(pathMeasure.length,  pos, tan)
-        mRadius = mDistanceRadius.last().second
-        curX = pos[0]
-        curY = pos[1]
-        extendContour()
+    }
+
+    private fun extendContour(){
+        val dx = (curX - prevX) / norm
+        val dy = (curY - prevY) / norm
+        //norm = sqrt(dx * dx + dy * dy)
+        val cosTheta = - (mRadius - mPrevRadius) / norm
+        val sinTheta = sqrt( 1 - cosTheta * cosTheta)
+
+        val leftUnitX = dx * cosTheta + dy * sinTheta
+        val leftUnitY = -dx * sinTheta + dy * cosTheta
+        val rightUnitX = dx * cosTheta - dy * sinTheta
+        val rightUnitY = dx * sinTheta + dy * cosTheta
+
+        if (norm > mRadius * minGapFactor * 0.2 && norm > (mRadius - mPrevRadius).absoluteValue ) {
+            contourPath.moveTo(prevX + leftUnitX * mPrevRadius, prevY + leftUnitY * mPrevRadius)
+            contourPath.lineTo(prevX + rightUnitX * mPrevRadius, prevY + rightUnitY * mPrevRadius)
+            contourPath.lineTo(curX + rightUnitX * mRadius, curY + rightUnitY * mRadius)
+            contourPath.lineTo(curX + leftUnitX * mRadius, curY + leftUnitY * mRadius)
+            contourPath.close()
+        }
+
+        contourPath.addCircle(curX, curY, mRadius, Path.Direction.CCW)
+        prevX = curX
+        prevY = curY
+        mPrevRadius = mRadius
     }
 
     fun quadSmooth(level: Int) {
@@ -173,30 +192,6 @@ class DynPath{
         mDistanceRadius = newArr
         updateContour()
     }
-
-    private fun extendContour(){
-        val cosTheta = - (mRadius - mPrevRadius) / norm
-        val sinTheta = sqrt( 1 - cosTheta * cosTheta)
-
-        val leftUnitX = tan[0] * cosTheta + tan[1] * sinTheta
-        val leftUnitY = -tan[0] * sinTheta + tan[1] * cosTheta
-        val rightUnitX = tan[0] * cosTheta - tan[1] * sinTheta
-        val rightUnitY = tan[0] * sinTheta + tan[1] * cosTheta
-
-        if (norm > mRadius * minGapFactor * 0.2 && norm > (mRadius - mPrevRadius).absoluteValue ) {
-            contourPath.moveTo(prevX + leftUnitX * mPrevRadius, prevY + leftUnitY * mPrevRadius)
-            contourPath.lineTo(prevX + rightUnitX * mPrevRadius, prevY + rightUnitY * mPrevRadius)
-            contourPath.lineTo(curX + rightUnitX * mRadius, curY + rightUnitY * mRadius)
-            contourPath.lineTo(curX + leftUnitX * mRadius, curY + leftUnitY * mRadius)
-            contourPath.close()
-        }
-
-        contourPath.addCircle(curX, curY, mRadius, Path.Direction.CCW)
-        prevX = curX
-        prevY = curY
-        mPrevRadius = mRadius
-    }
-
 
     fun convertToXYR(distanceArray: MutableList<Pair<Float, Float>>, path: Path, upscale: Int = 1, upsCaleOriginalArray: Boolean = false): MutableList<Triple<Float, Float, Float>>{
         val arrXYR = mutableListOf<Triple<Float, Float, Float>>()

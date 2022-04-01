@@ -21,12 +21,10 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
     var opacity = 1f
 
     var penMode = true
-
     /*
     val op = opacity.coerceAtMost(1f).coerceAtLeast(0f)
     val mask = ((255 * op).toInt() shl 24) + 0x00FFFFFF
     brushColor = brushColor and mask
-
      */
 
     private var pictureDrawable =PictureDrawable(Picture())
@@ -68,7 +66,6 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
     private val mStrokeHistory = arrayListOf<DrawingParameters>()
     private val mStrokeFuture = arrayListOf<DrawingParameters>()
 
-
     init {
         this.isFocusableInTouchMode = true
     }
@@ -84,7 +81,6 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
             parameters.dynPath.draw(canvas, mPaint)
             //parameters.dynPath.drawSpine(canvas, mPaint)
         }
-
         //canvas.drawPath(mEraser, mEraserPaint)
         //canvas.restore()
     }
@@ -95,11 +91,10 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
         } else {
             return
         }
-
         when (selectedTool) {
             TOOL_PEN, TOOL_LINE -> {
                 mStrokeHistory.removeLast()
-                mPath = Path().apply{}
+                mDynPath.rewind()
                 Toast.makeText(context, "stroke has been cancelled", Toast.LENGTH_SHORT).show()
             }
             TOOL_ERASER -> {
@@ -112,6 +107,14 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
             }
             else -> throw Error ("nonexistent tool value")
         }
+        invalidate()
+    }
+
+    override fun onGenericMotionEvent(event : MotionEvent) : Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_HOVER_ENTER && drawingStarted) {
+            cancelStroke()
+        }
+        return super.onGenericMotionEvent(event)
     }
 
     override fun onTouchEvent(event : MotionEvent) : Boolean {
@@ -154,6 +157,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
                 mDynPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
             }
             MotionEvent.ACTION_UP -> {
+                mDynPath.updateContour()
                 mDynPath = DynPath()
                 drawingStarted = false
             }
@@ -168,7 +172,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
             //Toast.makeText(context,"finger is turned off ", Toast.LENGTH_SHORT).show()
             return true
         }
-        when (event.action) {
+        when (event.actionMasked) {
             MotionEvent.ACTION_DOWN-> {
                 mStrokeFuture.clear()
                 mStrokeHistory.add(DrawingParameters())
@@ -187,12 +191,16 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
                     //TODO gap is too small
                 }
             }
-            MotionEvent.ACTION_UP -> {
+            MotionEvent.ACTION_HOVER_ENTER -> {
+                Toast.makeText(context,"hover Entered", Toast.LENGTH_SHORT).show()
+                if (drawingStarted) {
+                    cancelStroke()
+                }
+            }
 
-                mDynPath.quadSmooth(0)
+            MotionEvent.ACTION_UP -> {
+                //mDynPath.quadSmooth(1)
                 mDynPath.updateContour()
-                //mDynPath.finalPath()
-                //mDynPath.finishLine()
                 mDynPath = DynPath()
                 drawingStarted = false
             }
@@ -302,10 +310,8 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
 
     inner class DrawingParameters() {
         val color = brushColor
-        val brushSize = strokeSize
         val alpha = opacity
         val toolType = selectedTool
-        val path = mPath
         val dynPath = mDynPath
         val eraserIdx = mErasedIndices
         var isErased = false

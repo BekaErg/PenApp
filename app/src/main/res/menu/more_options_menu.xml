@@ -17,7 +17,7 @@
 
             <item
                 android:checkable="true"
-                android:checked="true"
+                android:checked="false"
                 android:id="@+id/lock_zoom"
                 android:title="@string/lock_zoom" />
 
