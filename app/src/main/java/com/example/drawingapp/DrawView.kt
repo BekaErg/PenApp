@@ -4,14 +4,10 @@ import android.content.Context
 import android.graphics.*
 import android.graphics.drawable.PictureDrawable
 import android.util.AttributeSet
-import android.util.Log
 import android.view.MotionEvent
-import android.view.ScaleGestureDetector
-import android.view.ScaleGestureDetector.SimpleOnScaleGestureListener
 import android.view.View
 import android.widget.Toast
 import kotlin.math.pow
-import kotlin.math.sqrt
 
 class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
     var selectedTool = TOOL_PEN
@@ -30,14 +26,17 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
     private var pictureDrawable =PictureDrawable(Picture())
     private var picture = Picture()
     private var finalPicture = Picture()
+    private var mCanvas = Canvas()
+    lateinit var mBitmap: Bitmap
 
     private var drawingStarted = false
     private var mCurTouchX = 0f
     private var mCurTouchY = 0f
     private var mCurStrokeRadius = 0f
 
-
     private var mDynPath = DynPath()
+
+
 
     private val mEraserRadius = 25f
     private var mEraser = Path()
@@ -45,7 +44,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
     private var mPaint = Paint().apply {
         isAntiAlias = true
         style = Paint.Style.STROKE
-        strokeWidth = 10f
+        strokeWidth = 0.5f
         strokeJoin = Paint.Join.ROUND
         strokeCap = Paint.Cap.ROUND
     }
@@ -71,9 +70,22 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
     }
 
 
+    override fun onLayout(changed : Boolean, left : Int, top : Int, right : Int, bottom : Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        mBitmap = Bitmap.createBitmap(this.width, this.height, Bitmap.Config.ARGB_8888)
+        mCanvas = Canvas(mBitmap)
+    }
+
+    override fun invalidate() {
+        refreshPicture()
+        super.invalidate()
+    }
+
     override fun onDraw(canvas : Canvas) {
         super.onDraw(canvas)
 
+        canvas.drawPicture(picture)
+/*
         for (parameters in mStrokeHistory) {
             if (parameters.isErased || parameters.toolType == TOOL_ERASER) {continue}
             updatePaint(parameters)
@@ -81,6 +93,8 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
             parameters.dynPath.draw(canvas, mPaint)
             //parameters.dynPath.drawSpine(canvas, mPaint)
         }
+
+ */
         //canvas.drawPath(mEraser, mEraserPaint)
         //canvas.restore()
     }
@@ -200,6 +214,9 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
 
             MotionEvent.ACTION_UP -> {
                 //mDynPath.quadSmooth(1)
+                //mDynPath.draw(mCanvas, mPaint)
+                refreshPicture()
+                picture.endRecording()
                 mDynPath.updateContour()
                 mDynPath = DynPath()
                 drawingStarted = false
@@ -252,6 +269,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
             if (!mRegion.isEmpty) {
                 parameters.isErased = true
                 mErasedIndices.add(i)
+                invalidate()
                 //mStrokeHistory.add(DrawingParameters())
             }
         }
@@ -280,13 +298,28 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
             }
         }
         mStrokeFuture.add(params)
+        refreshPicture()
         invalidate()
     }
+
+
+    private fun refreshPicture() {
+        val canvas = picture.beginRecording(width, height)
+        for (parameters in mStrokeHistory) {
+            if (parameters.isErased || parameters.toolType == TOOL_ERASER) {continue}
+            updatePaint(parameters)
+            //parameters.dynPath.drawPicture(canvas)
+            parameters.dynPath.draw(canvas, mPaint)
+            //parameters.dynPath.drawSpine(canvas, mPaint)
+        }
+        picture.endRecording()
+        mCanvas.drawPicture(picture)
+    }
+
 
     fun redo() {
         if (mStrokeFuture.isEmpty()) return
         val params = mStrokeFuture.removeLast()
-
         mStrokeHistory.add(params)
         if (params.toolType == TOOL_ERASER) {
             for (i in params.eraserIdx) {
