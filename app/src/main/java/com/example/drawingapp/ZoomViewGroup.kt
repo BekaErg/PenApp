@@ -10,6 +10,8 @@ import android.widget.Toast
 open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : LinearLayout(context, attrs)  {
 
     var lockZoom = false
+    var maxZoom = 20f
+    var minZoom = 0.3f
     private var mScaleDetector = ScaleGestureDetector(context, ScaleListener())
     private var mScale = 1f
     private var mScaleFactor = 1f
@@ -30,23 +32,9 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
     private var mCenterY = 0f
 
 
-    private var mIsInProgress = false
     private var multiTouchTriggered = false
-
+    var multiTouchEnded = false
     private var mLastTimeClick: Long = 0
-
-
-/*
-    override fun onLayout(changed : Boolean, l : Int, t : Int, r : Int, b : Int) {
-        val childCount = childCount
-        for (i in 0 until childCount) {
-            val child = getChildAt(i)
-            if (child.visibility != GONE) {
-                child.layout(l, t, l + child.measuredWidth, t + child.measuredHeight)
-            }
-        }
-    }
-    */
 
     override fun onSizeChanged(w : Int, h : Int, oldw : Int, oldh : Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -63,11 +51,9 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
         return super.drawChild(canvas, child, drawingTime)
     }
 
-
     override fun onInterceptTouchEvent(ev : MotionEvent) : Boolean {
+        //double Tap
         if (ev.action and ev.actionMasked == MotionEvent.ACTION_DOWN && ev.getToolType(0) == MotionEvent.TOOL_TYPE_FINGER) {
-            //Toast.makeText(context, "Action Down outside", Toast.LENGTH_SHORT).show()
-            //Toast.makeText(context, "CenterX: $mCenterX  TransX: $mTransX  PivotX: $mPivotX", Toast.LENGTH_SHORT).show()
             if (System.currentTimeMillis() - mLastTimeClick < 300) {
                 mScale = 1f
                 mTransX = 0f
@@ -91,7 +77,7 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
         this.requestFocus()
         super.onTouchEvent(event)
         //if Pressed outside child View, here we end up after child ontouchview
-
+        //TODO when pen enters, multitouchEnded stays false
         mPointerCount = event.pointerCount
         if (mPointerCount  <= 1 || event.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS) {
             return false
@@ -118,6 +104,7 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
 
             MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_UP -> {
                 multiTouchTriggered = false
+                multiTouchEnded = true
             }
         }
 
@@ -132,18 +119,14 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
 
     private inner class ScaleListener : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScale(detector : ScaleGestureDetector) : Boolean {
-
-            mIsInProgress = detector.isInProgress
             //mPivotX = detector.focusX
             //mPivotY = detector.focusY
-
             mScaleFactor = detector.scaleFactor
-            mScaleFactor = (0.3f / mScale).coerceAtLeast(mScaleFactor.coerceAtMost(20.0f / mScale))
+            mScaleFactor = (minZoom / mScale).coerceAtLeast(mScaleFactor.coerceAtMost(maxZoom / mScale))
 
             mScale *= mScaleFactor
-
             // Don't let the object get too small or too large.
-            mScale = 0.3f.coerceAtLeast(mScale.coerceAtMost(20.0f))
+            mScale = minZoom.coerceAtLeast(mScale.coerceAtMost(maxZoom))
             invalidate()
             return true
         }

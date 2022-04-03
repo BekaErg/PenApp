@@ -4,9 +4,11 @@ import android.content.Context
 import android.graphics.*
 import android.graphics.drawable.PictureDrawable
 import android.util.AttributeSet
+import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.widget.Toast
+import androidx.core.graphics.scale
 import kotlin.math.pow
 
 class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
@@ -27,7 +29,9 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
     private var picture = Picture()
     private var finalPicture = Picture()
     private var mCanvas = Canvas()
+    private var mZoomedCanvas = Canvas()
     lateinit var mBitmap: Bitmap
+    lateinit var mZoomedBitmap: Bitmap
 
     private var drawingStarted = false
     private var mCurTouchX = 0f
@@ -36,7 +40,10 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
 
     private var mDynPath = DynPath()
 
-
+    private var dX = translationX
+    private var dY  = translationY
+    private var scale = scaleX
+    private lateinit var container: ZoomViewGroup
 
     private val mEraserRadius = 25f
     private var mEraser = Path()
@@ -72,31 +79,27 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
 
     override fun onLayout(changed : Boolean, left : Int, top : Int, right : Int, bottom : Int) {
         super.onLayout(changed, left, top, right, bottom)
-        mBitmap = Bitmap.createBitmap(this.width, this.height, Bitmap.Config.ARGB_8888)
+        mZoomedBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        mBitmap = Bitmap.createBitmap(2*this.width, 2* this.height, Bitmap.Config.ARGB_8888)
         mCanvas = Canvas(mBitmap)
-    }
-
-    override fun invalidate() {
-        refreshPicture()
-        super.invalidate()
+        container = this.parent as ZoomViewGroup
     }
 
     override fun onDraw(canvas : Canvas) {
         super.onDraw(canvas)
-
-        canvas.drawPicture(picture)
-/*
-        for (parameters in mStrokeHistory) {
-            if (parameters.isErased || parameters.toolType == TOOL_ERASER) {continue}
-            updatePaint(parameters)
-            //parameters.dynPath.drawPicture(canvas)
-            parameters.dynPath.draw(canvas, mPaint)
-            //parameters.dynPath.drawSpine(canvas, mPaint)
+        if (container.multiTouchEnded) {
+            container.multiTouchEnded = false
+            refreshPicture()
         }
 
- */
-        //canvas.drawPath(mEraser, mEraserPaint)
-        //canvas.restore()
+        canvas.drawBitmap(mBitmap, 0f, 0f, null)
+        canvas.save()
+        canvas.scale(1/scale, 1/scale, width/2f, height/2f)
+        canvas.translate(-dX, -dY)
+        canvas.drawBitmap(mZoomedBitmap, 0f, 0f, null)
+        canvas.restore()
+
+        mDynPath.draw(canvas, mPaint)
     }
 
     private fun cancelStroke() {
@@ -132,13 +135,13 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
     }
 
     override fun onTouchEvent(event : MotionEvent) : Boolean {
+        Log.i("gela", "single Finger Move")
         this.requestFocus()
-
         if (event.pointerCount > 1 && drawingStarted) {
             cancelStroke()
             return true
         }
-        //mScaleDetector.onTouchEvent(event);
+
         mCurTouchX = event.x
         mCurTouchY = event.y
 
@@ -190,6 +193,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
             MotionEvent.ACTION_DOWN-> {
                 mStrokeFuture.clear()
                 mStrokeHistory.add(DrawingParameters())
+                updatePaint(DrawingParameters())
                 drawingStarted = true
                 applyPressure(event.getPressure(0))
                 mDynPath.moveTo(mCurTouchX,mCurTouchY, mCurStrokeRadius)
@@ -202,7 +206,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
                     applyPressure(event.getHistoricalPressure(i))
 
                     mDynPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
-                    //TODO gap is too small
+
                 }
             }
             MotionEvent.ACTION_HOVER_ENTER -> {
@@ -213,8 +217,9 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
             }
 
             MotionEvent.ACTION_UP -> {
+
                 //mDynPath.quadSmooth(1)
-                //mDynPath.draw(mCanvas, mPaint)
+                mDynPath.draw(mCanvas, mPaint)
                 refreshPicture()
                 picture.endRecording()
                 mDynPath.updateContour()
@@ -269,6 +274,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
             if (!mRegion.isEmpty) {
                 parameters.isErased = true
                 mErasedIndices.add(i)
+                refreshPicture()
                 invalidate()
                 //mStrokeHistory.add(DrawingParameters())
             }
@@ -287,6 +293,38 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
         mPaint.alpha = (parameters.alpha * 255).toInt()
     }
 
+
+    private fun refreshPicture() {
+        //Toast.makeText(context, "bitmap has been refreshed", Toast.LENGTH_SHORT).show()
+        dX = translationX
+        dY = translationY
+        scale = scaleX
+        mZoomedBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        mZoomedCanvas = Canvas(mZoomedBitmap)
+        mZoomedCanvas.drawColor(0xFFEEEEEE.toInt())
+        mZoomedCanvas.save()
+        mZoomedCanvas.translate(translationX, translationY)
+        mZoomedCanvas.scale(scaleX, scaleY, width/2f, height/2f)
+        for (parameters in mStrokeHistory) {
+            if (parameters.isErased || parameters.toolType == TOOL_ERASER) {continue}
+            updatePaint(parameters)
+            //parameters.dynPath.drawPicture(canvas)
+            parameters.dynPath.draw(mZoomedCanvas, mPaint)
+            //parameters.dynPath.drawSpine(canvas, mPaint)
+        }
+        //mDynPath.draw(mZoomedCanvas, mPaint)
+        mZoomedCanvas.restore()
+
+
+        Toast.makeText(context, "scale is ${scaleX}", Toast.LENGTH_SHORT).show()
+        mCanvas.drawColor(Color.WHITE)
+        for (parameters in mStrokeHistory) {
+            if (parameters.isErased || parameters.toolType == TOOL_ERASER) {continue}
+            updatePaint(parameters)
+            parameters.dynPath.draw(mCanvas, mPaint)
+        }
+    }
+
     fun undo() {
         if (mStrokeHistory.isEmpty()) return
         val params = mStrokeHistory.removeLast()
@@ -302,21 +340,6 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
         invalidate()
     }
 
-
-    private fun refreshPicture() {
-        val canvas = picture.beginRecording(width, height)
-        for (parameters in mStrokeHistory) {
-            if (parameters.isErased || parameters.toolType == TOOL_ERASER) {continue}
-            updatePaint(parameters)
-            //parameters.dynPath.drawPicture(canvas)
-            parameters.dynPath.draw(canvas, mPaint)
-            //parameters.dynPath.drawSpine(canvas, mPaint)
-        }
-        picture.endRecording()
-        mCanvas.drawPicture(picture)
-    }
-
-
     fun redo() {
         if (mStrokeFuture.isEmpty()) return
         val params = mStrokeFuture.removeLast()
@@ -326,11 +349,13 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
                 mStrokeHistory[i].isErased = true
             }
         }
+        refreshPicture()
         invalidate()
     }
 
     fun clearCanvas() {
         mStrokeHistory.clear()
+        refreshPicture()
         invalidate()
     }
 
