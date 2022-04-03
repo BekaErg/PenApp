@@ -112,7 +112,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
             TOOL_PEN, TOOL_LINE -> {
                 mStrokeHistory.removeLast()
                 mDynPath.rewind()
-                Toast.makeText(context, "stroke has been cancelled", Toast.LENGTH_SHORT).show()
+                //Toast.makeText(context, "stroke has been cancelled", Toast.LENGTH_SHORT).show()
             }
             TOOL_ERASER -> {
                 if (mErasedIndices.isNotEmpty()) {
@@ -128,15 +128,18 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
     }
 
     override fun onGenericMotionEvent(event : MotionEvent) : Boolean {
-        if (event.actionMasked == MotionEvent.ACTION_HOVER_ENTER && drawingStarted) {
-            cancelStroke()
+        if (event.actionMasked == MotionEvent.ACTION_HOVER_ENTER) {
+            if (drawingStarted) {
+                cancelStroke()
+            } else {
+                refreshPicture()
+            }
         }
         return super.onGenericMotionEvent(event)
     }
 
     override fun onTouchEvent(event : MotionEvent) : Boolean {
         Log.i("gela", "single Finger Move")
-        this.requestFocus()
         if (event.pointerCount > 1 && drawingStarted) {
             cancelStroke()
             return true
@@ -162,27 +165,21 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
         //TODO add Lock pressure mode
         when (event.action) {
             MotionEvent.ACTION_DOWN-> {
-                mStrokeFuture.clear()
-                mStrokeHistory.add(DrawingParameters())
-                drawingStarted = true
-                mCurStrokeRadius = strokeSize / 2
-                mDynPath.moveTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
+                startDrawing(null)
             }
             MotionEvent.ACTION_MOVE -> {
                 mDynPath.restart()
-                applyPressure(event.getPressure(0))
                 mDynPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
             }
             MotionEvent.ACTION_UP -> {
-                mDynPath.updateContour()
-                mDynPath = DynPath()
-                drawingStarted = false
+                finishDrawing()
             }
             else -> return false
         }
         invalidate()
         return true
     }
+
 
     private fun drawWithPen(event : MotionEvent): Boolean {
         if (penMode && event.getToolType(0) == MotionEvent.TOOL_TYPE_FINGER) {
@@ -191,12 +188,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
         }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN-> {
-                mStrokeFuture.clear()
-                mStrokeHistory.add(DrawingParameters())
-                updatePaint(DrawingParameters())
-                drawingStarted = true
-                applyPressure(event.getPressure(0))
-                mDynPath.moveTo(mCurTouchX,mCurTouchY, mCurStrokeRadius)
+                startDrawing(event.getPressure(0))
                 //At this stage we only need to apply pressure to store in the mPrevPressure
             }
             MotionEvent.ACTION_MOVE -> {
@@ -204,32 +196,35 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
                     mCurTouchX = event.getHistoricalX(i)
                     mCurTouchY = event.getHistoricalY(i)
                     applyPressure(event.getHistoricalPressure(i))
-
                     mDynPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
-
                 }
             }
-            MotionEvent.ACTION_HOVER_ENTER -> {
-                Toast.makeText(context,"hover Entered", Toast.LENGTH_SHORT).show()
-                if (drawingStarted) {
-                    cancelStroke()
-                }
-            }
-
             MotionEvent.ACTION_UP -> {
-
-                //mDynPath.quadSmooth(1)
-                mDynPath.draw(mCanvas, mPaint)
-                refreshPicture()
-                picture.endRecording()
-                mDynPath.updateContour()
-                mDynPath = DynPath()
-                drawingStarted = false
+                finishDrawing()
             }
             else -> return false
         }
         invalidate()
         return true
+    }
+
+    private fun startDrawing(pressure: Float? = null) {
+        if (pressure != null) {
+            applyPressure(pressure)
+        }
+        mStrokeFuture.clear()
+        mStrokeHistory.add(DrawingParameters())
+        drawingStarted = true
+        mCurStrokeRadius = strokeSize / 2
+        updatePaint(DrawingParameters())
+        mDynPath.moveTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
+    }
+    private fun finishDrawing() {
+        mDynPath.draw(mCanvas, mPaint)
+        refreshPicture()
+        mDynPath.updateContour()
+        mDynPath = DynPath()
+        drawingStarted = false
     }
 
     private fun erase(event : MotionEvent): Boolean {
@@ -241,12 +236,10 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
             }
 
             MotionEvent.ACTION_MOVE, 213 -> {
-                //Check past paths if they are close to the eraser
                 mEraser.rewind()
                 mEraser.addCircle(mCurTouchX, mCurTouchY, mEraserRadius, Path.Direction.CW)
                 eraserHelper()
             }
-
             MotionEvent.ACTION_UP, 212 -> {
                 if (mErasedIndices.isNotEmpty()) {
                     mStrokeHistory.add(DrawingParameters())
@@ -282,7 +275,6 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
     }
 
     private fun applyPressure(pressure: Float) {
-        //mCurStrokeRadius = 0.5f * strokeSize * (1f - (1f - pressure).pow(2))
         mCurStrokeRadius = 0.000f * strokeSize + 0.500f * strokeSize * (1f - (1f - pressure).pow(2))
     }
 
@@ -295,28 +287,26 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
 
 
     private fun refreshPicture() {
-        //Toast.makeText(context, "bitmap has been refreshed", Toast.LENGTH_SHORT).show()
+        //draw on current Portion of the frame
         dX = translationX
         dY = translationY
         scale = scaleX
         mZoomedBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         mZoomedCanvas = Canvas(mZoomedBitmap)
-        mZoomedCanvas.drawColor(0xFFEEEEEE.toInt())
+        //mZoomedCanvas.drawColor(0xFFEEEEEE.toInt())
         mZoomedCanvas.save()
         mZoomedCanvas.translate(translationX, translationY)
         mZoomedCanvas.scale(scaleX, scaleY, width/2f, height/2f)
+
         for (parameters in mStrokeHistory) {
             if (parameters.isErased || parameters.toolType == TOOL_ERASER) {continue}
             updatePaint(parameters)
-            //parameters.dynPath.drawPicture(canvas)
             parameters.dynPath.draw(mZoomedCanvas, mPaint)
-            //parameters.dynPath.drawSpine(canvas, mPaint)
         }
         //mDynPath.draw(mZoomedCanvas, mPaint)
         mZoomedCanvas.restore()
 
-
-        Toast.makeText(context, "scale is ${scaleX}", Toast.LENGTH_SHORT).show()
+        //draw on a whole bitmap
         mCanvas.drawColor(Color.WHITE)
         for (parameters in mStrokeHistory) {
             if (parameters.isErased || parameters.toolType == TOOL_ERASER) {continue}

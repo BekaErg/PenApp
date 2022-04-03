@@ -3,6 +3,7 @@ package com.example.drawingapp
 import android.content.Context
 import android.graphics.Canvas
 import android.util.AttributeSet
+import android.util.Log
 import android.view.*
 import android.widget.LinearLayout
 import android.widget.Toast
@@ -32,7 +33,7 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
     private var mCenterY = 0f
 
 
-    private var multiTouchTriggered = false
+    var multiTouchTriggered = false
     var multiTouchEnded = false
     private var mLastTimeClick: Long = 0
 
@@ -52,6 +53,7 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
     }
 
     override fun onInterceptTouchEvent(ev : MotionEvent) : Boolean {
+        Log.i("gela", "spying")
         //double Tap
         if (ev.action and ev.actionMasked == MotionEvent.ACTION_DOWN && ev.getToolType(0) == MotionEvent.TOOL_TYPE_FINGER) {
             if (System.currentTimeMillis() - mLastTimeClick < 300) {
@@ -65,9 +67,10 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
         }
 
         return if (ev.pointerCount == 2 && ev.getToolType(0) == MotionEvent.TOOL_TYPE_FINGER) {
-            //Toast.makeText(context, "Double down outside", Toast.LENGTH_SHORT).show()
+            // pass to onTouchEvent of this view
             true
         } else {
+            Log.i("gela", "Passing to child")
             multiTouchTriggered = false
             false
         }
@@ -75,12 +78,18 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
 
     override fun onTouchEvent(event : MotionEvent) : Boolean {
         this.requestFocus()
-        super.onTouchEvent(event)
+
+        //super.onTouchEvent(event)
         //if Pressed outside child View, here we end up after child ontouchview
         //TODO when pen enters, multitouchEnded stays false
         mPointerCount = event.pointerCount
+        Log.i("gela", "container onTouchEvent $mPointerCount  action:${event.action}")
         if (mPointerCount  <= 1 || event.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS) {
-            return false
+            Log.i("gela", "single finger, but in container")
+            return true
+        } else if (mPointerCount > 3 && multiTouchTriggered) {
+            Log.i("gela", "End multitouch")
+            multiTouchEnded = true
         }
         mCurX = event.getX(0)
         mCurY = event.getY(0)
@@ -94,20 +103,28 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
         when (event.action and event.actionMasked) {
             MotionEvent.ACTION_MOVE -> {
                 if (multiTouchTriggered) {
+                    Log.i("gela", "Multitouching $mPointerCount")
                     val dx = pivotX - (mCenterX + mTransX)
                     val dy = pivotY - (mCenterY + mTransY)
                     mTransX += (mCurX - mPrevX) - dx*(mScaleFactor - 1)
                     mTransY += (mCurY - mPrevY) - dy*(mScaleFactor - 1)
+                } else {
+                    multiTouchEnded = true
+                    Log.i("gela", "End multiTouch")
                 }
-                multiTouchTriggered = true
             }
 
-            MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_UP -> {
-                multiTouchTriggered = false
+            MotionEvent.ACTION_CANCEL -> {
                 multiTouchEnded = true
+                Log.i("gela", "Action Cancelled")
+            }
+            MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_UP -> {
+                multiTouchEnded = true
+                Log.i("gela", "End multitouch")
             }
         }
 
+        //this means we already started multiTouch
         multiTouchTriggered = true
         mPrevX = mCurX
         mPrevY = mCurY
