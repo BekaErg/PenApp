@@ -2,48 +2,37 @@ package com.example.drawingapp
 
 import android.content.Context
 import android.graphics.*
-import android.graphics.drawable.PictureDrawable
 import android.util.AttributeSet
 import android.util.Log
 import android.view.MotionEvent
 import android.view.View
-import android.widget.Toast
-import androidx.core.graphics.scale
+import androidx.core.graphics.transform
+import androidx.core.view.doOnLayout
 import kotlin.math.pow
 
-class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
+class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, attrs) {
     var selectedTool = TOOL_PEN
-    var strokeSize = 40f
+    var strokeSize = 0f
     var toolBackUp = selectedTool
     var brushColor = Color.BLACK
     var opacity = 1f
-
     var penMode = true
-    /*
-    val op = opacity.coerceAtMost(1f).coerceAtLeast(0f)
-    val mask = ((255 * op).toInt() shl 24) + 0x00FFFFFF
-    brushColor = brushColor and mask
-     */
+    var smoothingLevel = 0
 
-    private var pictureDrawable =PictureDrawable(Picture())
-    private var picture = Picture()
-    private var finalPicture = Picture()
     private var mCanvas = Canvas()
-    private var mZoomedCanvas = Canvas()
-    lateinit var mBitmap: Bitmap
-    lateinit var mZoomedBitmap: Bitmap
+    private var mFrameCanvas = Canvas()
+    lateinit var mBitmap : Bitmap
+    lateinit var mFrameBitmap : Bitmap
 
     private var drawingStarted = false
     private var mCurTouchX = 0f
     private var mCurTouchY = 0f
     private var mCurStrokeRadius = 0f
 
-    private var mDynPath = DynPath()
+    private lateinit var container : ZoomViewGroup
 
-    private var dX = translationX
-    private var dY  = translationY
-    private var scale = scaleX
-    private lateinit var container: ZoomViewGroup
+    private var frameRectF = RectF()
+    private var frameMatrix = Matrix()
 
     private val mEraserRadius = 25f
     private var mEraser = Path()
@@ -55,17 +44,20 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
         strokeJoin = Paint.Join.ROUND
         strokeCap = Paint.Cap.ROUND
     }
-    private var mEraserPaint = Paint().apply{
+    private var mEraserPaint = Paint().apply {
         isAntiAlias = true
         strokeWidth = 4f
         style = Paint.Style.STROKE
         brushColor = Color.BLACK
         color = Color.BLACK
     }
+    private val mClearPaint = Paint().apply {
+        isAntiAlias = true
+        style = Paint.Style.FILL
+        xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
+    }
 
-    private var mPath = Path().apply{fillType = Path.FillType.WINDING}
-    private var mTempPath = Path().apply{}
-
+    private var mDynPath = DynPath()
     private var mRegion = Region()
 
     //Arrays
@@ -74,35 +66,132 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
 
     init {
         this.isFocusableInTouchMode = true
-    }
-
-
-    override fun onLayout(changed : Boolean, left : Int, top : Int, right : Int, bottom : Int) {
-        super.onLayout(changed, left, top, right, bottom)
-        mZoomedBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        mBitmap = Bitmap.createBitmap(2*this.width, 2* this.height, Bitmap.Config.ARGB_8888)
-        mCanvas = Canvas(mBitmap)
-        container = this.parent as ZoomViewGroup
+        this.doOnLayout {
+            mFrameBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            mFrameCanvas = Canvas(mFrameBitmap)
+            mBitmap = Bitmap.createBitmap(2 * this.width, 2 * this.height, Bitmap.Config.ARGB_8888)
+            mCanvas = Canvas(mBitmap)
+            frameRectF.set(0f, 0f, width.toFloat(), height.toFloat())
+            container = this.parent as ZoomViewGroup
+        }
     }
 
     override fun onDraw(canvas : Canvas) {
         super.onDraw(canvas)
         if (container.multiTouchEnded) {
             container.multiTouchEnded = false
-            refreshPicture()
+            redrawEverything()
         }
-
-        canvas.drawBitmap(mBitmap, 0f, 0f, null)
+        //Alternative to all this is clipOutRectangle, only working from API 26
         canvas.save()
-        canvas.scale(1/scale, 1/scale, width/2f, height/2f)
-        canvas.translate(-dX, -dY)
-        canvas.drawBitmap(mZoomedBitmap, 0f, 0f, null)
+        canvas.clipRect(0f, 0f, frameRectF.left, frameRectF.bottom)
+        canvas.drawBitmap(mBitmap, 0f, 0f, null)
         canvas.restore()
 
+        canvas.save()
+        canvas.clipRect(frameRectF.left, 0f, this.width.toFloat(), frameRectF.top)
+        canvas.drawBitmap(mBitmap, 0f, 0f, null)
+        canvas.restore()
+
+        canvas.save()
+        canvas.clipRect(frameRectF.right, frameRectF.top, this.width.toFloat(), this.height.toFloat())
+        canvas.drawBitmap(mBitmap, 0f, 0f, null)
+        canvas.restore()
+
+        canvas.save()
+        canvas.clipRect(0f, frameRectF.bottom, frameRectF.right, this.height.toFloat())
+        canvas.drawBitmap(mBitmap, 0f, 0f, null)
+        canvas.restore()
+
+        //draw frameCanvas
+        canvas.drawBitmap(mFrameBitmap, null, frameRectF, null)
         mDynPath.draw(canvas, mPaint)
+
+        //draw Eraser
+        mEraserPaint.strokeWidth = 4f / scaleX
+        canvas.drawPath(mEraser, mEraserPaint)
+    }
+
+    override fun onGenericMotionEvent(event : MotionEvent) : Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_HOVER_ENTER) {
+            if (drawingStarted) {
+                cancelStroke()
+            }
+        }
+        return super.onGenericMotionEvent(event)
+    }
+
+    override fun onTouchEvent(event : MotionEvent) : Boolean {
+        if (event.pointerCount > 1 && drawingStarted) {
+            cancelStroke()
+            return true
+        }
+        mCurTouchX = event.x
+        mCurTouchY = event.y
+        if (event.action == 211) {
+            toolBackUp = selectedTool
+            selectedTool = TOOL_ERASER
+        }
+
+        return when (selectedTool) {
+            TOOL_PEN -> drawWithPen(event)
+            TOOL_LINE -> drawLine(event)
+            TOOL_ERASER -> erase(event)
+            else -> throw Error("nonexistent tool value")
+        }
+    }
+
+    private fun drawLine(event : MotionEvent) : Boolean {
+        //TODO add Lock pressure mode
+        when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                startStroke(null)
+            }
+            MotionEvent.ACTION_MOVE -> {
+                mDynPath.restart()
+                mDynPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
+            }
+            MotionEvent.ACTION_UP -> {
+                finishStroke()
+            }
+            else -> return false
+        }
+        invalidate()
+        return true
+    }
+
+    private fun drawWithPen(event : MotionEvent) : Boolean {
+        if (penMode && event.getToolType(0) == MotionEvent.TOOL_TYPE_FINGER) {
+            return true
+        }
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                startStroke(event.getPressure(0))
+            }
+            MotionEvent.ACTION_MOVE -> {
+                for (i in 0 until event.historySize) {
+                    mCurTouchX = event.getHistoricalX(i)
+                    mCurTouchY = event.getHistoricalY(i)
+                    applyPressure(event.getHistoricalPressure(i))
+                    mDynPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
+                }
+            }
+            MotionEvent.ACTION_UP -> {
+                finishStroke()
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                if (drawingStarted) {
+                    cancelStroke()
+                }
+            }
+            else -> return false
+        }
+        invalidate()
+        return true
     }
 
     private fun cancelStroke() {
+        Log.i("gela", "stroke was cancelled")
         if (drawingStarted) {
             drawingStarted = false
         } else {
@@ -115,132 +204,59 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
                 //Toast.makeText(context, "stroke has been cancelled", Toast.LENGTH_SHORT).show()
             }
             TOOL_ERASER -> {
-                if (mErasedIndices.isNotEmpty()) {
+                if (drawingStarted) {
                     for (i in mErasedIndices) {
                         mStrokeHistory[i].isErased = false
                     }
                 }
                 mEraser.rewind()
             }
-            else -> throw Error ("nonexistent tool value")
+            else -> throw Error("nonexistent tool value")
         }
         invalidate()
     }
 
-    override fun onGenericMotionEvent(event : MotionEvent) : Boolean {
-        if (event.actionMasked == MotionEvent.ACTION_HOVER_ENTER) {
-            if (drawingStarted) {
-                cancelStroke()
-            } else {
-                refreshPicture()
-            }
-        }
-        return super.onGenericMotionEvent(event)
-    }
-
-    override fun onTouchEvent(event : MotionEvent) : Boolean {
-        Log.i("gela", "single Finger Move")
-        if (event.pointerCount > 1 && drawingStarted) {
-            cancelStroke()
-            return true
-        }
-
-        mCurTouchX = event.x
-        mCurTouchY = event.y
-
-        if (event.action == 211) {
-            toolBackUp = selectedTool
-            selectedTool = TOOL_ERASER
-        }
-
-        return when (selectedTool) {
-            TOOL_PEN -> drawWithPen(event)
-            TOOL_LINE -> drawLine(event)
-            TOOL_ERASER -> erase(event)
-            else -> throw Error ("nonexistent tool value")
-        }
-    }
-
-    private fun drawLine(event : MotionEvent): Boolean {
-        //TODO add Lock pressure mode
-        when (event.action) {
-            MotionEvent.ACTION_DOWN-> {
-                startDrawing(null)
-            }
-            MotionEvent.ACTION_MOVE -> {
-                mDynPath.restart()
-                mDynPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
-            }
-            MotionEvent.ACTION_UP -> {
-                finishDrawing()
-            }
-            else -> return false
-        }
-        invalidate()
-        return true
-    }
-
-
-    private fun drawWithPen(event : MotionEvent): Boolean {
-        if (penMode && event.getToolType(0) == MotionEvent.TOOL_TYPE_FINGER) {
-            //Toast.makeText(context,"finger is turned off ", Toast.LENGTH_SHORT).show()
-            return true
-        }
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN-> {
-                startDrawing(event.getPressure(0))
-                //At this stage we only need to apply pressure to store in the mPrevPressure
-            }
-            MotionEvent.ACTION_MOVE -> {
-                for (i in 0 until event.historySize) {
-                    mCurTouchX = event.getHistoricalX(i)
-                    mCurTouchY = event.getHistoricalY(i)
-                    applyPressure(event.getHistoricalPressure(i))
-                    mDynPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
-                }
-            }
-            MotionEvent.ACTION_UP -> {
-                finishDrawing()
-            }
-            else -> return false
-        }
-        invalidate()
-        return true
-    }
-
-    private fun startDrawing(pressure: Float? = null) {
+    private fun startStroke(pressure : Float? = null) {
+        updatePaint(DrawingParameters())
         if (pressure != null) {
             applyPressure(pressure)
+        } else {
+            mCurStrokeRadius = strokeSize / 2
         }
         mStrokeFuture.clear()
         mStrokeHistory.add(DrawingParameters())
         drawingStarted = true
-        mCurStrokeRadius = strokeSize / 2
-        updatePaint(DrawingParameters())
         mDynPath.moveTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
     }
-    private fun finishDrawing() {
+
+    private fun finishStroke() {
         mDynPath.draw(mCanvas, mPaint)
-        refreshPicture()
-        mDynPath.updateContour()
+
+        mFrameCanvas.save()
+        mFrameCanvas.setMatrix(matrix)
+        mDynPath.quadSmooth(smoothingLevel)
+        mDynPath.draw(mFrameCanvas, mPaint)
+        mFrameCanvas.restore()
+
         mDynPath = DynPath()
         drawingStarted = false
     }
 
-    private fun erase(event : MotionEvent): Boolean {
-        when (event.actionMasked) {
+    //TODO Change back to pen when event.action == Cancel
+    private fun erase(event : MotionEvent) : Boolean {
+        when (event.action and event.actionMasked) {
             MotionEvent.ACTION_DOWN, 211 -> {
+                Log.i("gela","action down: $selectedTool")
                 mEraser.addCircle(mCurTouchX, mCurTouchY, mEraserRadius, Path.Direction.CW)
-                drawingStarted = true
                 eraserHelper()
             }
-
             MotionEvent.ACTION_MOVE, 213 -> {
                 mEraser.rewind()
-                mEraser.addCircle(mCurTouchX, mCurTouchY, mEraserRadius, Path.Direction.CW)
+                mEraser.addCircle(mCurTouchX, mCurTouchY, mEraserRadius / scaleX, Path.Direction.CW)
                 eraserHelper()
             }
             MotionEvent.ACTION_UP, 212 -> {
+                Log.i("gela","action up: ${event.action} ${mStrokeHistory.size}")
                 if (mErasedIndices.isNotEmpty()) {
                     mStrokeHistory.add(DrawingParameters())
                     mErasedIndices = arrayListOf()
@@ -249,6 +265,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
                 if (event.action == 212) {
                     selectedTool = toolBackUp
                 }
+                drawingStarted = false
             }
             else -> return false
         }
@@ -257,7 +274,13 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
     }
 
     private fun eraserHelper() {
-        val clip = Region((mCurTouchX - mEraserRadius).toInt(),(mCurTouchY - mEraserRadius).toInt(),(mCurTouchX + mEraserRadius).toInt(), (mCurTouchY + mEraserRadius).toInt())
+        //Could be changed to circle for more accuracy
+        val clip = Region(
+            (mCurTouchX - mEraserRadius / scaleX).toInt(),
+            (mCurTouchY - mEraserRadius / scaleX).toInt(),
+            (mCurTouchX + mEraserRadius / scaleX).toInt(),
+            (mCurTouchY + mEraserRadius / scaleX).toInt()
+        )
         val n = mStrokeHistory.size
         for (i in 0 until n) {
             val parameters = mStrokeHistory[i]
@@ -265,60 +288,61 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
             mRegion.setEmpty()
             mRegion.setPath(parameters.dynPath.contourPath, clip)
             if (!mRegion.isEmpty) {
+                drawingStarted = true
                 parameters.isErased = true
                 mErasedIndices.add(i)
-                refreshPicture()
+                redrawEverything()
                 invalidate()
                 //mStrokeHistory.add(DrawingParameters())
             }
         }
     }
 
-    private fun applyPressure(pressure: Float) {
+    private fun applyPressure(pressure : Float) {
         mCurStrokeRadius = 0.000f * strokeSize + 0.500f * strokeSize * (1f - (1f - pressure).pow(2))
     }
 
-    private fun updatePaint(parameters: DrawingParameters) {
+    private fun updatePaint(parameters : DrawingParameters) {
         mPaint.color = parameters.color
         //mPaint.strokeWidth = parameters.brushSize
         mPaint.strokeWidth = 0.2f
         mPaint.alpha = (parameters.alpha * 255).toInt()
     }
 
-
-    private fun refreshPicture() {
+    private fun redrawEverything() {
+        Log.i("gela", "refreshed ${container.multiTouchEnded}")
         //draw on current Portion of the frame
-        dX = translationX
-        dY = translationY
-        scale = scaleX
-        mZoomedBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        mZoomedCanvas = Canvas(mZoomedBitmap)
-        //mZoomedCanvas.drawColor(0xFFEEEEEE.toInt())
-        mZoomedCanvas.save()
-        mZoomedCanvas.translate(translationX, translationY)
-        mZoomedCanvas.scale(scaleX, scaleY, width/2f, height/2f)
-
+        mFrameCanvas.drawPaint(mClearPaint)
+        mFrameCanvas.save()
+        mFrameCanvas.setMatrix(matrix)
         for (parameters in mStrokeHistory) {
-            if (parameters.isErased || parameters.toolType == TOOL_ERASER) {continue}
+            if (parameters.isErased || parameters.toolType == TOOL_ERASER) {
+                continue
+            }
             updatePaint(parameters)
-            parameters.dynPath.draw(mZoomedCanvas, mPaint)
+            parameters.dynPath.draw(mFrameCanvas, mPaint)
         }
-        //mDynPath.draw(mZoomedCanvas, mPaint)
-        mZoomedCanvas.restore()
+        mFrameCanvas.restore()
 
         //draw on a whole bitmap
-        mCanvas.drawColor(Color.WHITE)
+        mCanvas.drawPaint(mClearPaint)
         for (parameters in mStrokeHistory) {
-            if (parameters.isErased || parameters.toolType == TOOL_ERASER) {continue}
+            if (parameters.isErased || parameters.toolType == TOOL_ERASER) {
+                continue
+            }
             updatePaint(parameters)
             parameters.dynPath.draw(mCanvas, mPaint)
         }
+        //Prepare frame for drawing
+        frameRectF.set(0f, 0f, width.toFloat(), height.toFloat())
+        frameMatrix = matrix
+        frameMatrix.invert(matrix)
+        frameRectF.transform(frameMatrix)
     }
 
     fun undo() {
         if (mStrokeHistory.isEmpty()) return
         val params = mStrokeHistory.removeLast()
-
         assert(!params.isErased)
         if (params.toolType == TOOL_ERASER) {
             for (i in params.eraserIdx) {
@@ -326,7 +350,7 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
             }
         }
         mStrokeFuture.add(params)
-        refreshPicture()
+        redrawEverything()
         invalidate()
     }
 
@@ -339,24 +363,24 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
                 mStrokeHistory[i].isErased = true
             }
         }
-        refreshPicture()
+        redrawEverything()
         invalidate()
     }
 
     fun clearCanvas() {
         mStrokeHistory.clear()
-        refreshPicture()
+        redrawEverything()
         invalidate()
     }
 
-    fun getBitmap(): Bitmap {
+    fun getBitmap() : Bitmap {
         val bitmap = Bitmap.createBitmap(this.width, this.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap!!)
         this.draw(canvas)
         return bitmap
     }
 
-    inner class DrawingParameters() {
+    inner class DrawingParameters {
         val color = brushColor
         val alpha = opacity
         val toolType = selectedTool
@@ -364,7 +388,6 @@ class DrawView(context: Context, attrs: AttributeSet? = null) : View(context, at
         val eraserIdx = mErasedIndices
         var isErased = false
     }
-
 
     companion object {
         const val TOOL_PEN = 0

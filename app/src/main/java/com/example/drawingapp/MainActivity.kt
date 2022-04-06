@@ -128,16 +128,6 @@ class MainActivity : AppCompatActivity(){
             R.id.save_image -> {
                 val name = UUID.randomUUID().toString() + "-jarti.jpg"
                 savePhotoLauncher.launch(name)
-                //Toast.makeText(this, "The feature has not been added yet", Toast.LENGTH_SHORT).show()
-                //requestPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
-                /*
-                val result = saveBitmap()
-                Snackbar.make(binding.root, result, Snackbar.LENGTH_INDEFINITE)
-                    .setAction("Cancel") {
-                    }.show()
-
-                 */
-                //loadBitmap()
                 true
             }
 

@@ -61,6 +61,7 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
                 mTransX = 0f
                 mTransY = 0f
                 invalidate()
+                multiTouchEnded = true
                 return true
             }
             mLastTimeClick = System.currentTimeMillis()
@@ -83,12 +84,11 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
         //if Pressed outside child View, here we end up after child ontouchview
         //TODO when pen enters, multitouchEnded stays false
         mPointerCount = event.pointerCount
-        Log.i("gela", "container onTouchEvent $mPointerCount  action:${event.action}")
         if (mPointerCount  <= 1 || event.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS) {
-            Log.i("gela", "single finger, but in container")
+            //Log.i("gela", "single finger, but in container")
             return true
         } else if (mPointerCount > 3 && multiTouchTriggered) {
-            Log.i("gela", "End multitouch")
+            //Log.i("gela", "End multitouch")
             multiTouchEnded = true
         }
         mCurX = event.getX(0)
@@ -103,24 +103,24 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
         when (event.action and event.actionMasked) {
             MotionEvent.ACTION_MOVE -> {
                 if (multiTouchTriggered) {
-                    Log.i("gela", "Multitouching $mPointerCount")
+                    //Log.i("gela", "Multitouching $mPointerCount")
                     val dx = pivotX - (mCenterX + mTransX)
                     val dy = pivotY - (mCenterY + mTransY)
                     mTransX += (mCurX - mPrevX) - dx*(mScaleFactor - 1)
                     mTransY += (mCurY - mPrevY) - dy*(mScaleFactor - 1)
                 } else {
                     multiTouchEnded = true
-                    Log.i("gela", "End multiTouch")
+                    //Log.i("gela", "End multiTouch")
                 }
             }
 
             MotionEvent.ACTION_CANCEL -> {
                 multiTouchEnded = true
-                Log.i("gela", "Action Cancelled")
+                //Log.i("gela", "Action Cancelled")
             }
             MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_UP -> {
                 multiTouchEnded = true
-                Log.i("gela", "End multitouch")
+                //Log.i("gela", "End multitouch")
             }
         }
 
