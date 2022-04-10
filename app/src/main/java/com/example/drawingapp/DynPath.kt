@@ -31,9 +31,11 @@ class DynPath {
 
     private var smoothLevel = 1
 
+    /**
+     * similar to Path.moveTo()
+     */
     fun moveTo(x : Float, y : Float, radius : Float) {
         mDistanceRadius.add(Pair(0f, radius))
-
         spinePath.moveTo(x, y)
         contourPath.addCircle(x, y, radius, Path.Direction.CCW)
         mPrevRadius = radius
@@ -45,6 +47,9 @@ class DynPath {
         firstRad = radius
     }
 
+    /**
+     * similar to Path.lineTo()
+     */
     fun lineTo(x : Float, y : Float, radius : Float) {
         norm = sqrt((x - prevX) * (x - prevX) + (y - prevY) * (y - prevY))
         discardedX = x
@@ -66,7 +71,13 @@ class DynPath {
         extendContour()
     }
 
-    fun draw(canvas : Canvas, paint : Paint) {
+    /**
+     * Draws contour path on the canvas
+     * Use fill paint to get normal brush effect
+     * use smoothEffect makes drawing of the path feel more responsive
+     * Only recommended to turn of smoothEffect when the paint is translucent
+     */
+    fun draw(canvas : Canvas, paint : Paint, smoothEffect: Boolean = true) {
         canvas.drawPath(contourPath, paint)
         //TODO fix transparent brush issue
         canvas.drawCircle(discardedX, discardedY, discardedRadius, paint)
@@ -74,10 +85,16 @@ class DynPath {
 
     }
 
+    /**
+     * Draws the spine path on the canvas
+     */
     fun drawSpine(canvas : Canvas, paint : Paint) {
         canvas.drawPath(spinePath, paint)
     }
 
+    /**
+     * similar to Path.rewind()
+     */
     fun rewind() {
         spinePath.rewind()
         contourPath.rewind()
@@ -85,11 +102,18 @@ class DynPath {
         mPrevRadius = 0f
     }
 
+    /**
+     * reverts back path to the starting point
+     */
     fun restart() {
         rewind()
         this.moveTo(firstX, firstY, firstRad)
     }
 
+    /**
+     * If the spinePath was modified, updateContour has to be used in order to
+     * obtain new corresponding contour Path
+     */
     fun updateContour() {
         var curDist = 0f
         var n = 0
@@ -119,32 +143,11 @@ class DynPath {
         }
     }
 
-    private fun extendContour() {
-        val dx = (curX - prevX) / norm
-        val dy = (curY - prevY) / norm
-        //norm = sqrt(dx * dx + dy * dy)
-        val cosTheta = -(mRadius - mPrevRadius) / norm
-        val sinTheta = sqrt(1 - cosTheta * cosTheta)
 
-        val leftUnitX = dx * cosTheta + dy * sinTheta
-        val leftUnitY = -dx * sinTheta + dy * cosTheta
-        val rightUnitX = dx * cosTheta - dy * sinTheta
-        val rightUnitY = dx * sinTheta + dy * cosTheta
 
-        if (norm > mRadius * minGapFactor * 0.2 && norm > (mRadius - mPrevRadius).absoluteValue) {
-            contourPath.moveTo(prevX + leftUnitX * mPrevRadius, prevY + leftUnitY * mPrevRadius)
-            contourPath.lineTo(prevX + rightUnitX * mPrevRadius, prevY + rightUnitY * mPrevRadius)
-            contourPath.lineTo(curX + rightUnitX * mRadius, curY + rightUnitY * mRadius)
-            contourPath.lineTo(curX + leftUnitX * mRadius, curY + leftUnitY * mRadius)
-            contourPath.close()
-        }
-
-        contourPath.addCircle(curX, curY, mRadius, Path.Direction.CCW)
-        prevX = curX
-        prevY = curY
-        mPrevRadius = mRadius
-    }
-
+    /**
+     * Makes spine path smoother (and modifies contour accordingly). Higher level will result to smoother path.
+     */
     fun quadSmooth(level : Int) {
         if (level <= 0) {
             return
@@ -194,7 +197,34 @@ class DynPath {
         updateContour()
     }
 
-    fun convertToXYR(
+    //helper function for moveTo()
+    private fun extendContour() {
+        val dx = (curX - prevX) / norm
+        val dy = (curY - prevY) / norm
+        //norm = sqrt(dx * dx + dy * dy)
+        val cosTheta = -(mRadius - mPrevRadius) / norm
+        val sinTheta = sqrt(1 - cosTheta * cosTheta)
+
+        val leftUnitX = dx * cosTheta + dy * sinTheta
+        val leftUnitY = -dx * sinTheta + dy * cosTheta
+        val rightUnitX = dx * cosTheta - dy * sinTheta
+        val rightUnitY = dx * sinTheta + dy * cosTheta
+
+        if (norm > mRadius * minGapFactor * 0.2 && norm > (mRadius - mPrevRadius).absoluteValue) {
+            contourPath.moveTo(prevX + leftUnitX * mPrevRadius, prevY + leftUnitY * mPrevRadius)
+            contourPath.lineTo(prevX + rightUnitX * mPrevRadius, prevY + rightUnitY * mPrevRadius)
+            contourPath.lineTo(curX + rightUnitX * mRadius, curY + rightUnitY * mRadius)
+            contourPath.lineTo(curX + leftUnitX * mRadius, curY + leftUnitY * mRadius)
+            contourPath.close()
+        }
+
+        contourPath.addCircle(curX, curY, mRadius, Path.Direction.CCW)
+        prevX = curX
+        prevY = curY
+        mPrevRadius = mRadius
+    }
+
+    private fun convertToXYR(
         distanceArray : MutableList<Pair<Float, Float>>,
         path : Path,
         upscale : Int = 1,

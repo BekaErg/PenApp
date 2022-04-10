@@ -340,6 +340,25 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         frameRectF.transform(frameMatrix)
     }
 
+    fun getHistory(): MutableList<DrawingParameters> {
+        val arr = mutableListOf<DrawingParameters>()
+        //TODO change this to iterators
+        for (params in mStrokeHistory) {
+            if (params.toolType != TOOL_ERASER && !params.isErased) {
+                arr.add(params)
+            }
+        }
+        return arr
+    }
+
+    fun setHistory(arr: MutableList<DrawingParameters>?) {
+        mStrokeHistory.clear()
+        if (arr == null) return
+        for (params in mStrokeHistory) {
+            mStrokeHistory.add(params)
+        }
+    }
+
     fun undo() {
         if (mStrokeHistory.isEmpty()) return
         val params = mStrokeHistory.removeLast()

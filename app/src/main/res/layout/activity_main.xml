@@ -255,7 +255,7 @@
         android:layout_width="240dp"
         android:layout_height="339dp"
         android:layout_centerInParent="true"
-        android:layout_marginTop="3dp"
+        android:background="@drawable/background_rectangle"
         android:clickable="false"
         android:elevation="3dp"
         android:visibility="invisible"
