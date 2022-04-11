@@ -115,9 +115,9 @@ class DynPath {
      * obtain new corresponding contour Path
      */
     fun updateContour() {
-        var curDist = 0f
-        var n = 0
-        var delta = 0f
+        var curDist : Float
+        var n : Int
+        var delta : Float
         val pathMeasure = PathMeasure(Path(spinePath), false)
         pathMeasure.getPosTan(0f, pos, null)
 
@@ -269,10 +269,10 @@ class DynPath {
         val pathMeasure = PathMeasure(Path(spinePath), false)
         val path = Path()
 
-        var curDist = 0f
-        var curRad = 0f
-        var n = 0
-        var delta = 0f
+        var curDist : Float
+        var curRad : Float
+        var n : Int
+        var delta : Float
 
         for ((prev, cur) in mDistanceRadius.zip(mDistanceRadius.drop(1))) {
             n = ceil((cur.first - prev.first) / (minGapFactor * (prev.second + cur.second))).toInt()

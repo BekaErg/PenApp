@@ -57,7 +57,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
     }
 
-    private var mDynPath = DynPath()
+    private var mBrushPath = BrushPath()
     private var mRegion = Region()
 
     //Arrays
@@ -82,6 +82,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
             container.multiTouchEnded = false
             redrawEverything()
         }
+
         //Alternative to all this is clipOutRectangle, only working from API 26
         canvas.save()
         canvas.clipRect(0f, 0f, frameRectF.left, frameRectF.bottom)
@@ -105,7 +106,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
 
         //draw frameCanvas
         canvas.drawBitmap(mFrameBitmap, null, frameRectF, null)
-        mDynPath.draw(canvas, mPaint)
+        mBrushPath.draw(canvas, mPaint)
 
         //draw Eraser
         mEraserPaint.strokeWidth = 4f / scaleX
@@ -148,8 +149,8 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                 startStroke(null)
             }
             MotionEvent.ACTION_MOVE -> {
-                mDynPath.restart()
-                mDynPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
+                mBrushPath.restart()
+                mBrushPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
             }
             MotionEvent.ACTION_UP -> {
                 finishStroke()
@@ -173,11 +174,11 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                     mCurTouchX = event.getHistoricalX(i)
                     mCurTouchY = event.getHistoricalY(i)
                     applyPressure(event.getHistoricalPressure(i))
-                    mDynPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
+                    mBrushPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
                 }
             }
             MotionEvent.ACTION_UP -> {
-                finishStroke()
+                finishStroke(smoothing = 4)
             }
             MotionEvent.ACTION_CANCEL -> {
                 if (drawingStarted) {
@@ -200,7 +201,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         when (selectedTool) {
             TOOL_PEN, TOOL_LINE -> {
                 mStrokeHistory.removeLast()
-                mDynPath.rewind()
+                mBrushPath.rewind()
                 //Toast.makeText(context, "stroke has been cancelled", Toast.LENGTH_SHORT).show()
             }
             TOOL_ERASER -> {
@@ -226,19 +227,19 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         mStrokeFuture.clear()
         mStrokeHistory.add(DrawingParameters())
         drawingStarted = true
-        mDynPath.moveTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
+        mBrushPath.moveTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
     }
 
-    private fun finishStroke() {
-        mDynPath.draw(mCanvas, mPaint)
+    private fun finishStroke(smoothing: Int = 0) {
+        mBrushPath.draw(mCanvas, mPaint)
+        mBrushPath.quadSmooth(smoothing)
 
         mFrameCanvas.save()
         mFrameCanvas.setMatrix(matrix)
-        mDynPath.quadSmooth(smoothingLevel)
-        mDynPath.draw(mFrameCanvas, mPaint)
+        mBrushPath.draw(mFrameCanvas, mPaint)
         mFrameCanvas.restore()
 
-        mDynPath = DynPath()
+        mBrushPath = BrushPath()
         drawingStarted = false
     }
 
@@ -255,7 +256,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                 mEraser.addCircle(mCurTouchX, mCurTouchY, mEraserRadius / scaleX, Path.Direction.CW)
                 eraserHelper()
             }
-            MotionEvent.ACTION_UP, 212 -> {
+            MotionEvent.ACTION_UP, 212, MotionEvent.ACTION_CANCEL -> {
                 Log.i("gela","action up: ${event.action} ${mStrokeHistory.size}")
                 if (mErasedIndices.isNotEmpty()) {
                     mStrokeHistory.add(DrawingParameters())
@@ -300,6 +301,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
 
     private fun applyPressure(pressure : Float) {
         mCurStrokeRadius = 0.000f * strokeSize + 0.500f * strokeSize * (1f - (1f - pressure).pow(2))
+        //mCurStrokeRadius = mCurStrokeRadius.coerceAtLeast(0.5f)
     }
 
     private fun updatePaint(parameters : DrawingParameters) {
@@ -310,6 +312,10 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     }
 
     private fun redrawEverything() {
+        val pathMatrix = Matrix()
+        //pathMatrix.setScale(2f, 0.5f, width.toFloat() / 2, height.toFloat() / 2)
+        pathMatrix.setRotate(45f, width.toFloat() / 2, height.toFloat() / 2)
+
         Log.i("gela", "refreshed ${container.multiTouchEnded}")
         //draw on current Portion of the frame
         mFrameCanvas.drawPaint(mClearPaint)
@@ -320,6 +326,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                 continue
             }
             updatePaint(parameters)
+            //parameters.dynPath.transform(pathMatrix)
             parameters.dynPath.draw(mFrameCanvas, mPaint)
         }
         mFrameCanvas.restore()
@@ -403,7 +410,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         val color = brushColor
         val alpha = opacity
         val toolType = selectedTool
-        val dynPath = mDynPath
+        val dynPath = mBrushPath
         val eraserIdx = mErasedIndices
         var isErased = false
     }
