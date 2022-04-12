@@ -18,6 +18,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     var opacity = 1f
     var penMode = true
     var smoothingLevel = 0
+    var minPressure = 0
 
     private var mCanvas = Canvas()
     private var mFrameCanvas = Canvas()
@@ -178,7 +179,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                 }
             }
             MotionEvent.ACTION_UP -> {
-                finishStroke(smoothing = 4)
+                finishStroke(smoothing = smoothingLevel)
             }
             MotionEvent.ACTION_CANCEL -> {
                 if (drawingStarted) {
@@ -300,7 +301,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     }
 
     private fun applyPressure(pressure : Float) {
-        mCurStrokeRadius = 0.000f * strokeSize + 0.500f * strokeSize * (1f - (1f - pressure).pow(2))
+        mCurStrokeRadius = minPressure * strokeSize + (0.5f - minPressure) * strokeSize * (1f - (1f - pressure).pow(2))
         //mCurStrokeRadius = mCurStrokeRadius.coerceAtLeast(0.5f)
     }
 

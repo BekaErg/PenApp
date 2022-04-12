@@ -9,10 +9,15 @@ import kotlin.math.sqrt
 class BrushPath {
     var minGapFactor = 0.1f
     var contourPath = Path()
+    var directionBias = Pair(1f/sqrt(2f), -1f/sqrt(2f))
+        set(value) {
+            val norm = sqrt(value.first * value.first + value.second * value.second)
+            field = Pair(value.first / norm, value.second / norm)
+        }
 
     private var curX = 0f
-    private var prevX = 0f
     private var curY = 0f
+    private var prevX = 0f
     private var prevY = 0f
     private var norm = 1f
     private var mRadius = 0f
@@ -125,7 +130,6 @@ class BrushPath {
         updateContour()
     }
 
-
     /**
      * If the array was modified, updateContour has to be used in order to
      * obtain new corresponding contour Path
@@ -149,8 +153,8 @@ class BrushPath {
 
     //helper function for moveTo()
     private fun extendContour() {
-        val dx = (curX - prevX) / norm
-        val dy = (curY - prevY) / norm
+        val dx = (curX - prevX) / norm //* 0.5f
+        val dy = (curY - prevY) / norm //* 2f
         //norm = sqrt(dx * dx + dy * dy)
         val cosTheta = -(mRadius - mPrevRadius) / norm
         val sinTheta = sqrt(1 - cosTheta * cosTheta)
@@ -160,16 +164,17 @@ class BrushPath {
         val rightUnitX = dx * cosTheta - dy * sinTheta
         val rightUnitY = dx * sinTheta + dy * cosTheta
 
-        if (norm > mRadius * minGapFactor * 0.2 && norm > (mRadius - mPrevRadius).absoluteValue) {
+        if (norm > (mRadius - mPrevRadius).absoluteValue) {
             contourPath.moveTo(prevX + leftUnitX * mPrevRadius, prevY + leftUnitY * mPrevRadius)
             contourPath.lineTo(prevX + rightUnitX * mPrevRadius, prevY + rightUnitY * mPrevRadius)
             contourPath.lineTo(curX + rightUnitX * mRadius, curY + rightUnitY * mRadius)
             contourPath.lineTo(curX + leftUnitX * mRadius, curY + leftUnitY * mRadius)
             contourPath.close()
         }
-
+        //contourPath.addOval(curX - mRadius * 2f, curY - mRadius * 0.5f, curX + mRadius * 2f, curY + mRadius * 0.5f, Path.Direction.CCW)
         contourPath.addCircle(curX, curY, mRadius, Path.Direction.CCW)
     }
+
     private fun moveToImpl(x : Float, y : Float, radius : Float, addToArr: Boolean) {
         if (addToArr) {
             arr.add(Triple(x,y,radius))
@@ -184,14 +189,14 @@ class BrushPath {
     private fun lineToImpl (x : Float, y : Float, radius : Float, addToArr: Boolean) {
         curX = x
         curY = y
-        mRadius = radius
         norm = sqrt((x - prevX) * (x - prevX) + (y - prevY) * (y - prevY))
-        if (norm < minGapFactor * radius) {
+        mRadius = radius// * calculateBias((curX - prevX) / norm, (curY - prevY)/norm)
+
+        if (norm < minGapFactor * mRadius) {
             return
         }
 
         extendContour()
-        contourPath.addCircle(x,y,radius, Path.Direction.CCW)
         if (addToArr) {
             arr.add(Triple(x,y,radius))
         }
@@ -201,5 +206,8 @@ class BrushPath {
         mPrevRadius = mRadius
     }
 
+    private fun calculateBias(x: Float, y: Float): Float {
+        return (x * directionBias.first + y * directionBias.second)*0.5f + 1.5f
+    }
 
 }
