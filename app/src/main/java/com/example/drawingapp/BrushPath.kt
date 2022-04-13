@@ -1,18 +1,28 @@
 package com.example.drawingapp
 
 import android.graphics.*
-import android.graphics.drawable.PictureDrawable
-import android.util.Log
 import kotlin.math.absoluteValue
 import kotlin.math.sqrt
 
 class BrushPath {
-    var minGapFactor = 0.1f
+    var minGapFactor = 0.02f
     var contourPath = Path()
-    var directionBias = Pair(1f/sqrt(2f), -1f/sqrt(2f))
+
+    /**
+     * The path becomes thicker as
+     */
+    var directionBiasVector = Pair(1f/sqrt(2f), -1f/sqrt(2f))
         set(value) {
             val norm = sqrt(value.first * value.first + value.second * value.second)
-            field = Pair(value.first / norm, value.second / norm)
+            field = if (norm == 0f) {
+                Pair(1f, 0f)
+            } else {
+                Pair(value.first / norm, value.second / norm)
+            }
+        }
+    var directionBiasLevel = 0.5f
+        set(value) {
+            field = value.coerceAtLeast(0f).coerceAtMost(1f)
         }
 
     private var curX = 0f
@@ -151,6 +161,28 @@ class BrushPath {
         }
     }
 
+    fun slidingAverage(windowSize: Int, downSampleFactor: Int) {
+        for (i in 0 until downSampleFactor - 1) {
+            arr.add(arr[arr.size - 1])
+        }
+        val temp = mutableListOf<Triple<Float, Float, Float>>()
+        for (i in 0 until arr.size step downSampleFactor) {
+            val l = (i - windowSize).coerceAtLeast(0)
+            val r = (i + windowSize).coerceAtMost(arr.size)
+            var avgX = 0f
+            var avgY = 0f
+            var avgR = 0f
+            for (j in l until r) {
+                avgX += arr[j].first / (r - l)
+                avgY += arr[j].second / (r - l)
+                avgR += arr[j].third / (r - l)
+            }
+            temp.add(Triple(avgX, avgY, avgR))
+        }
+        arr = temp
+        updateContour()
+    }
+
     //helper function for moveTo()
     private fun extendContour() {
         val dx = (curX - prevX) / norm //* 0.5f
@@ -176,11 +208,13 @@ class BrushPath {
     }
 
     private fun moveToImpl(x : Float, y : Float, radius : Float, addToArr: Boolean) {
-        if (addToArr) {
-            arr.add(Triple(x,y,radius))
-        }
+        mRadius = (1 - directionBiasLevel) * radius
         contourPath.rewind()
         contourPath.addCircle(x,y,radius, Path.Direction.CCW)
+
+        if (addToArr) {
+            arr.add(Triple(x,y,mRadius))
+        }
 
         prevX = x
         prevY = y
@@ -190,7 +224,7 @@ class BrushPath {
         curX = x
         curY = y
         norm = sqrt((x - prevX) * (x - prevX) + (y - prevY) * (y - prevY))
-        mRadius = radius// * calculateBias((curX - prevX) / norm, (curY - prevY)/norm)
+        mRadius = radius * calculateBias((curX - prevX) / norm, (curY - prevY)/norm)
 
         if (norm < minGapFactor * mRadius) {
             return
@@ -207,7 +241,7 @@ class BrushPath {
     }
 
     private fun calculateBias(x: Float, y: Float): Float {
-        return (x * directionBias.first + y * directionBias.second)*0.5f + 1.5f
+        return (x * directionBiasVector.first + y * directionBiasVector.second) * directionBiasLevel + 2f - directionBiasLevel
     }
 
 }

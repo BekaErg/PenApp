@@ -18,7 +18,10 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     var opacity = 1f
     var penMode = true
     var smoothingLevel = 0
-    var minPressure = 0
+    var minPressure = 0.2f
+        set(value) {
+            field = value.coerceAtLeast(0f).coerceAtMost(0.5f)
+        }
 
     private var mCanvas = Canvas()
     private var mFrameCanvas = Canvas()
@@ -40,7 +43,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     private var mErasedIndices = arrayListOf<Int>()
     private var mPaint = Paint().apply {
         isAntiAlias = true
-        style = Paint.Style.STROKE
+        style = Paint.Style.FILL
         strokeWidth = 0.5f
         strokeJoin = Paint.Join.ROUND
         strokeCap = Paint.Cap.ROUND
@@ -171,12 +174,18 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                 startStroke(event.getPressure(0))
             }
             MotionEvent.ACTION_MOVE -> {
+                /*
+                applyPressure(event.getPressure(0))
+                mBrushPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
+                */
                 for (i in 0 until event.historySize) {
                     mCurTouchX = event.getHistoricalX(i)
                     mCurTouchY = event.getHistoricalY(i)
                     applyPressure(event.getHistoricalPressure(i))
                     mBrushPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
                 }
+
+
             }
             MotionEvent.ACTION_UP -> {
                 finishStroke(smoothing = smoothingLevel)
@@ -233,7 +242,8 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
 
     private fun finishStroke(smoothing: Int = 0) {
         mBrushPath.draw(mCanvas, mPaint)
-        mBrushPath.quadSmooth(smoothing)
+        //mBrushPath.quadSmooth(1, 4)
+        mBrushPath.slidingAverage(2, 2)
 
         mFrameCanvas.save()
         mFrameCanvas.setMatrix(matrix)
