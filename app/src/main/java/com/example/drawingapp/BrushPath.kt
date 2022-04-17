@@ -1,17 +1,19 @@
 package com.example.drawingapp
 
 import android.graphics.*
+import android.util.Log
 import kotlin.math.absoluteValue
 import kotlin.math.sqrt
 
 class BrushPath {
-    var minGapFactor = 0.02f
+    var minGapFactor = 0.2f
     var contourPath = Path()
 
     /**
-     * The path becomes thicker as
+     * The path thickness depends on direction of the movement
+     * It is thickest when moving across to the directionBiasVector
      */
-    var directionBiasVector = Pair(1f/sqrt(2f), -1f/sqrt(2f))
+    var directionBiasVector = Pair(1f / sqrt(2f), -1f / sqrt(2f))
         set(value) {
             val norm = sqrt(value.first * value.first + value.second * value.second)
             field = if (norm == 0f) {
@@ -20,7 +22,12 @@ class BrushPath {
                 Pair(value.first / norm, value.second / norm)
             }
         }
-    var directionBiasLevel = 0.5f
+
+    /**
+     * Variation between thickest and thinnest lines due to moving direction
+     * (This is independent from pressure level)
+     */
+    var directionBiasLevel = 0.7f
         set(value) {
             field = value.coerceAtLeast(0f).coerceAtMost(1f)
         }
@@ -33,11 +40,12 @@ class BrushPath {
     private var mRadius = 0f
     private var mPrevRadius = 0f
     private val pos = floatArrayOf(0f, 0f)
-
+    private val inputBufferSize = 4
 
     private var smoothLevel = 1
     private var mPathMeasure = PathMeasure()
     private var arr = mutableListOf<Triple<Float, Float, Float>>()
+    private var inputBuffer : ArrayDeque<Triple<Float, Float, Float>> = ArrayDeque()
 
     /**
      * similar to Path.moveTo()
@@ -50,7 +58,49 @@ class BrushPath {
      * similar to Path.lineTo()
      */
     fun lineTo(x : Float, y : Float, radius : Float) {
-        lineToImpl(x, y, radius, true)
+        inputBuffer.addLast(Triple(x, y, radius))
+        if (inputBuffer.size > inputBufferSize) inputBuffer.removeFirst()
+
+        val (sumX, sumY, sumRad) = inputBuffer.fold(Triple(0f, 0f, 0f)) { acc, value ->
+            Triple(
+                acc.first + value.first,
+                acc.second + value.second,
+                acc.third + value.third
+            )
+        }
+        lineToImpl(
+            sumX / inputBuffer.size,
+            sumY / inputBuffer.size,
+            sumRad / inputBuffer.size,
+            true
+        )
+    }
+
+    fun finish() {
+/*
+lineToImpl(inputBuffer.last().first, inputBuffer.last().second, inputBuffer.last().third, true)
+*/
+        var (sumX, sumY, sumRad) = inputBuffer.fold(Triple(0f, 0f, 0f)) { acc, value ->
+            Triple(
+                acc.first + value.first,
+                acc.second + value.second,
+                acc.third + value.third
+            )
+        }
+        while (inputBuffer.size > 1) {
+            val (x, y, rad) = inputBuffer.removeFirst()
+            sumX -= x
+            sumY -= y
+            sumRad -= rad
+            lineToImpl(
+                sumX / inputBuffer.size,
+                sumY / inputBuffer.size,
+                sumRad / inputBuffer.size,
+                true
+            )
+        }
+        inputBuffer.clear()
+        Log.i("gela", "$arr")
     }
 
     /**
@@ -59,8 +109,11 @@ class BrushPath {
      * use smoothEffect makes drawing of the path feel more responsive
      * Only recommended to turn of smoothEffect when the paint is translucent
      */
-    fun draw(canvas : Canvas, paint : Paint, smoothEffect: Boolean = true) {
+    fun draw(canvas : Canvas, paint : Paint, preformanceBooster : Boolean = true) {
         canvas.drawPath(contourPath, paint)
+        for ((x, y, r) in inputBuffer) {
+            canvas.drawCircle(x, y, r, paint)
+        }
     }
 
     /**
@@ -70,6 +123,7 @@ class BrushPath {
         contourPath.rewind()
         arr.clear()
         mPrevRadius = 0f
+        inputBuffer.clear()
     }
 
     /**
@@ -86,9 +140,9 @@ class BrushPath {
     /**
      * similar to Path.transform
      */
-    fun transform(matrix: Matrix) {
+    fun transform(matrix : Matrix) {
         if (arr.isEmpty()) return
-        val src: FloatArray = arr.flatMap{listOf(it.first, it.second)}.toFloatArray()
+        val src : FloatArray = arr.flatMap { listOf(it.first, it.second) }.toFloatArray()
         matrix.mapPoints(src)
         src.zip(src.drop(1)).filterIndexed { i, _ ->
             i % 2 == 0
@@ -99,12 +153,35 @@ class BrushPath {
     }
 
     /**
+     * Applies smoothing / upscaling / downscaling
+     * level should be from 1 to 100
+     */
+    fun postSmooth(smoothType : SmoothType, level : Int) {
+        when (smoothType) {
+            SmoothType.SLIDING_AVERAGE -> {
+                slidingAverage(level, 1)
+            }
+            SmoothType.QUADRATIC -> {
+                quadSmooth(level, 1)
+            }
+            SmoothType.UPSCALE -> {
+                val temp = minGapFactor
+                quadSmooth(1, level)
+            }
+            SmoothType.DOWNSAMPLE -> {
+                slidingAverage(1, level)
+            }
+        }
+    }
+
+
+    /**
      * Smooths line by quadratic curves.
      * higher level will smooth more.
      * The resulting path will contain upscaleFactor times more vertices
      * Use-case of upscaleFactor > 1 is when the path is have been enlarged by scaling
      */
-    fun quadSmooth(level : Int, upscaleFactor: Int = 1) {
+    private fun quadSmooth(level : Int, upscaleFactor : Int = 1) {
         if (level <= 0) {
             return
         }
@@ -117,7 +194,10 @@ class BrushPath {
         newArr.add(Triple(prevX, prevY, mPrevRadius))
 
         for (i in 0 until arr.size step level) {
-            val (l, r) = if (i + level < arr.size) Pair(i, i + level) else Pair(arr.size - 1, arr.size - 1)
+            val (l, r) = if (i + level < arr.size) Pair(i, i + level) else Pair(
+                arr.size - 1,
+                arr.size - 1
+            )
 
             mRadius = (arr[l].third + arr[r].third) / 2f
             curX = (arr[l].first + arr[r].first) / 2f
@@ -146,13 +226,18 @@ class BrushPath {
      */
     private fun updateContour() {
         this.moveToImpl(arr[0].first, arr[0].second, arr[0].third, false)
-        for ((x,y,rad) in arr.drop(0).dropLast(0)) {
-            this.lineToImpl(x, y, rad, false)
+        for ((x, y, rad) in arr.drop(0).dropLast(0)) {
+            this.lineToImpl(x, y, rad, false, 0f)
         }
     }
 
     //subdivide path that is set to mPathMeasure into n parts.
-    private fun subdivide(n: Int, prevRadius: Float, nextRadius: Float, targetArray: MutableList<Triple<Float, Float, Float>>)  {
+    private fun subdivide(
+        n : Int,
+        prevRadius : Float,
+        nextRadius : Float,
+        targetArray : MutableList<Triple<Float, Float, Float>>
+    ) {
         for (j in 1 .. n) {
             val d = j * mPathMeasure.length / n
             val radius = prevRadius + (nextRadius - prevRadius) * j / n
@@ -161,10 +246,16 @@ class BrushPath {
         }
     }
 
-    fun slidingAverage(windowSize: Int, downSampleFactor: Int) {
+    private fun slidingAverage(windowSize : Int, downSampleFactor : Int) {
+        if (arr.size < 2) return
+        //Adding downSampleFactor copies of the last point
+        //To avoid shifting of it
+        Log.i("gela", "pre  arr.size: ${arr}")
         for (i in 0 until downSampleFactor - 1) {
-            arr.add(arr[arr.size - 1])
+            val x = arr.last()
+            arr.add(Triple(x.first, x.second, x.third))
         }
+        Log.i("gela", "post: ${arr}")
         val temp = mutableListOf<Triple<Float, Float, Float>>()
         for (i in 0 until arr.size step downSampleFactor) {
             val l = (i - windowSize).coerceAtLeast(0)
@@ -185,9 +276,9 @@ class BrushPath {
 
     //helper function for moveTo()
     private fun extendContour() {
+//assert(norm == sqrt((curX - prevX) * (curX - prevX) + (curY - prevY) * (curY - prevY)))
         val dx = (curX - prevX) / norm //* 0.5f
         val dy = (curY - prevY) / norm //* 2f
-        //norm = sqrt(dx * dx + dy * dy)
         val cosTheta = -(mRadius - mPrevRadius) / norm
         val sinTheta = sqrt(1 - cosTheta * cosTheta)
 
@@ -197,42 +288,51 @@ class BrushPath {
         val rightUnitY = dx * sinTheta + dy * cosTheta
 
         if (norm > (mRadius - mPrevRadius).absoluteValue) {
+            //Log.i("gela", "${arr.size}")
             contourPath.moveTo(prevX + leftUnitX * mPrevRadius, prevY + leftUnitY * mPrevRadius)
             contourPath.lineTo(prevX + rightUnitX * mPrevRadius, prevY + rightUnitY * mPrevRadius)
             contourPath.lineTo(curX + rightUnitX * mRadius, curY + rightUnitY * mRadius)
             contourPath.lineTo(curX + leftUnitX * mRadius, curY + leftUnitY * mRadius)
             contourPath.close()
         }
-        //contourPath.addOval(curX - mRadius * 2f, curY - mRadius * 0.5f, curX + mRadius * 2f, curY + mRadius * 0.5f, Path.Direction.CCW)
+//contourPath.addOval(curX - mRadius * 2f, curY - mRadius * 0.5f, curX + mRadius * 2f, curY + mRadius * 0.5f, Path.Direction.CCW)
         contourPath.addCircle(curX, curY, mRadius, Path.Direction.CCW)
     }
 
-    private fun moveToImpl(x : Float, y : Float, radius : Float, addToArr: Boolean) {
-        mRadius = (1 - directionBiasLevel) * radius
+    private fun moveToImpl(x : Float, y : Float, radius : Float, addToArr : Boolean) {
+        mRadius = (1f - directionBiasLevel) * radius
         contourPath.rewind()
-        contourPath.addCircle(x,y,radius, Path.Direction.CCW)
+        contourPath.addCircle(x, y, mRadius, Path.Direction.CCW)
 
         if (addToArr) {
-            arr.add(Triple(x,y,mRadius))
+            arr.add(Triple(x, y, mRadius))
         }
-
+        Log.i("gela", "prev ${prevX}")
         prevX = x
         prevY = y
-        mPrevRadius = radius
+        mPrevRadius = mRadius
     }
-    private fun lineToImpl (x : Float, y : Float, radius : Float, addToArr: Boolean) {
-        curX = x
-        curY = y
-        norm = sqrt((x - prevX) * (x - prevX) + (y - prevY) * (y - prevY))
-        mRadius = radius * calculateBias((curX - prevX) / norm, (curY - prevY)/norm)
 
-        if (norm < minGapFactor * mRadius) {
+    private fun lineToImpl(x : Float, y : Float, radius : Float, addToArr : Boolean, gapFactor: Float = minGapFactor) {
+        norm = sqrt((x - prevX) * (x - prevX) + (y - prevY) * (y - prevY))
+        if (norm == 0f) {
+            return
+        }
+        mRadius = if (addToArr) {
+            radius * calculateBias((x - prevX) / norm, (y - prevY) / norm)
+        } else {
+            radius
+        }
+        if (norm < gapFactor * mRadius) {
             return
         }
 
+        curX = x
+        curY = y
         extendContour()
+
         if (addToArr) {
-            arr.add(Triple(x,y,radius))
+            arr.add(Triple(x, y, mRadius))
         }
 
         prevX = curX
@@ -240,8 +340,19 @@ class BrushPath {
         mPrevRadius = mRadius
     }
 
-    private fun calculateBias(x: Float, y: Float): Float {
+    private fun calculateBias(x : Float, y : Float) : Float {
         return (x * directionBiasVector.first + y * directionBiasVector.second) * directionBiasLevel + 2f - directionBiasLevel
+    }
+
+
+    /**
+     * Enum used for different types of upscaling
+     */
+    enum class SmoothType {
+        SLIDING_AVERAGE,
+        QUADRATIC,
+        UPSCALE,
+        DOWNSAMPLE,
     }
 
 }

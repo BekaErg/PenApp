@@ -53,7 +53,7 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
     }
 
     override fun onInterceptTouchEvent(ev : MotionEvent) : Boolean {
-        Log.i("gela", "spying")
+        //Log.i("gela", "spying")
         //double Tap
         if (ev.action and ev.actionMasked == MotionEvent.ACTION_DOWN && ev.getToolType(0) == MotionEvent.TOOL_TYPE_FINGER) {
             if (System.currentTimeMillis() - mLastTimeClick < 300) {
@@ -71,7 +71,7 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
             // pass to onTouchEvent of this view
             true
         } else {
-            Log.i("gela", "Passing to child")
+            //Log.i("gela", "Passing to child")
             multiTouchTriggered = false
             false
         }

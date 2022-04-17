@@ -12,10 +12,26 @@
         android:focusable="true"
         style="@style/color_circle_frame_style">
         <ImageView
+            android:tag="background"
             android:src="@drawable/selected_color_circle"
             style="@style/selection_ring_style" />
         <ImageView
+            android:visibility="visible"
+            android:tag="brush"
+            android:id="@+id/brush"
             android:src="@drawable/ic_pen"
+            style="@style/color_circle_style" />
+        <ImageView
+            android:visibility="invisible"
+            android:tag="fountain_pen"
+            android:id="@+id/fountain_pen"
+            android:src="@drawable/ic_fountainpen"
+            style="@style/color_circle_style" />
+        <ImageView
+            android:visibility="invisible"
+            android:tag="ball_pen"
+            android:id="@+id/ball_pen"
+            android:src="@drawable/ic_ballpen"
             style="@style/color_circle_style" />
     </FrameLayout>
 
@@ -48,5 +64,6 @@
             android:scaleX="0.85"
             android:scaleY="0.85"/>
     </FrameLayout>
+
 
 </merge>

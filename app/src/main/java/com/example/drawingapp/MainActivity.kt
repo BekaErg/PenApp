@@ -1,16 +1,20 @@
 package com.example.drawingapp
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import android.view.*
 import android.widget.ImageView
 import android.widget.LinearLayout
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.view.menu.MenuBuilder
+import androidx.appcompat.view.menu.MenuPopupHelper
+import androidx.appcompat.widget.PopupMenu
 import androidx.core.view.iterator
 import androidx.preference.PreferenceManager
 import com.example.drawingapp.databinding.ActivityMainBinding
@@ -58,6 +62,8 @@ class MainActivity : AppCompatActivity(){
         }
     }
 
+    private var activityIsRunning = false
+
     private lateinit var binding: ActivityMainBinding
     private lateinit var drawView: DrawView
     private var parametersAdapter = ParametersAdapter()
@@ -98,11 +104,45 @@ class MainActivity : AppCompatActivity(){
                 false
             } else {false}
         }
-
         loadDrawingParams()
-
     }
 
+    //TODO change this by popUp view
+    @SuppressLint("RestrictedApi")
+    private fun penSelectorMenu(context: Context, v : View) {
+        val popup = PopupMenu(context, v)
+        //val inflater = this@MainActivity.getSystemService(LAYOUT_INFLATER_SERVICE) as LayoutInflater
+        popup.inflate(R.menu.brush_menu)
+
+        popup.setOnMenuItemClickListener {
+            when (it.itemId) {
+                R.id.brush -> {
+                    //Toast.makeText(this, "brush", Toast.LENGTH_SHORT).show()
+                    toolSelector.switchPen("brush")
+                    drawView.setPenPreset(DrawView.PEN_BRUSH)
+                    true
+                }
+                R.id.fountain_pen -> {
+                    toolSelector.switchPen("fountain_pen")
+                    drawView.setPenPreset(DrawView.PEN_FOUNTAIN)
+                    true
+                }
+                R.id.ball_pen -> {
+                    drawView.setPenPreset(DrawView.PEN_BALL)
+                    toolSelector.switchPen("ball_pen")
+                    true
+                }
+                else -> {
+                    false
+                }
+            }
+        }
+
+        val menuHelper = MenuPopupHelper(this,  popup.menu as MenuBuilder, v);
+        menuHelper.setForceShowIcon(true);
+        menuHelper.show();
+
+    }
 
 
     private fun loadBitmap() {
@@ -156,8 +196,14 @@ class MainActivity : AppCompatActivity(){
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        activityIsRunning = true
+    }
+
     override fun onStop() {
         super.onStop()
+        activityIsRunning = false
         saveDrawingParams()
     }
 
@@ -235,8 +281,16 @@ class MainActivity : AppCompatActivity(){
     }
 
     private fun selectTool() {
+
         toolSelector.switcher = {
-            drawView.selectedTool = it
+            tool, alreadySelected, view ->
+            drawView.selectedTool = tool
+            //TODO Figure out why I can not run penSelectorMenu
+            if (activityIsRunning && alreadySelected && tool == ToolSelectorLayout.PEN) {
+                penSelectorMenu(this@MainActivity, view)
+                //binding.popUpButton.performClick()
+                //penSelectorMenu(binding.popUpButton)
+            }
         }
     }
 

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+    <ImageView
+        android:src="@drawable/selected_color_circle"
+        style="@style/selection_ring_style" />
+
+    <ImageView
+        android:src="@drawable/ic_ballpen"
+        style="@style/color_circle_style"
+        android:rotation="10"
+        android:scaleX="0.85"
+        android:scaleY="0.85"/>
+
+    <ImageView
+        android:src="@drawable/ic_fountainpen"
+        style="@style/color_circle_style"
+        android:rotation="10"
+        android:scaleX="0.85"
+        android:scaleY="0.85"/>
+
+    <ImageView
+        android:src="@drawable/ic_pen"
+        style="@style/color_circle_style"
+        android:rotation="10"
+        android:scaleX="0.85"
+        android:scaleY="0.85"/>
+
+</FrameLayout>

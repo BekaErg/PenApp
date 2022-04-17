@@ -9,6 +9,7 @@ import android.view.View
 import androidx.core.graphics.transform
 import androidx.core.view.doOnLayout
 import kotlin.math.pow
+import kotlin.math.sqrt
 
 class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, attrs) {
     var selectedTool = TOOL_PEN
@@ -17,11 +18,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     var brushColor = Color.BLACK
     var opacity = 1f
     var penMode = true
-    var smoothingLevel = 0
-    var minPressure = 0.2f
-        set(value) {
-            field = value.coerceAtLeast(0f).coerceAtMost(0.5f)
-        }
+    var brushPathSettings = BrushSettings()
 
     private var mCanvas = Canvas()
     private var mFrameCanvas = Canvas()
@@ -41,9 +38,10 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     private val mEraserRadius = 25f
     private var mEraser = Path()
     private var mErasedIndices = arrayListOf<Int>()
+
     private var mPaint = Paint().apply {
         isAntiAlias = true
-        style = Paint.Style.FILL
+        style = Paint.Style.STROKE
         strokeWidth = 0.5f
         strokeJoin = Paint.Join.ROUND
         strokeCap = Paint.Cap.ROUND
@@ -188,7 +186,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
 
             }
             MotionEvent.ACTION_UP -> {
-                finishStroke(smoothing = smoothingLevel)
+                finishStroke()
             }
             MotionEvent.ACTION_CANCEL -> {
                 if (drawingStarted) {
@@ -237,13 +235,14 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         mStrokeFuture.clear()
         mStrokeHistory.add(DrawingParameters())
         drawingStarted = true
+        brushPathSettings.setPathSettings(mBrushPath)
         mBrushPath.moveTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
     }
 
-    private fun finishStroke(smoothing: Int = 0) {
+    private fun finishStroke() {
         mBrushPath.draw(mCanvas, mPaint)
-        //mBrushPath.quadSmooth(1, 4)
-        mBrushPath.slidingAverage(2, 2)
+        mBrushPath.finish()
+        //mBrushPath.postSmooth(BrushPath.SmoothType.UPSCALE, 4)
 
         mFrameCanvas.save()
         mFrameCanvas.setMatrix(matrix)
@@ -311,7 +310,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     }
 
     private fun applyPressure(pressure : Float) {
-        mCurStrokeRadius = minPressure * strokeSize + (0.5f - minPressure) * strokeSize * (1f - (1f - pressure).pow(2))
+        mCurStrokeRadius = brushPathSettings.minPressure * strokeSize + (0.5f - brushPathSettings.minPressure) * strokeSize * (1f - (1f - pressure).pow(2))
         //mCurStrokeRadius = mCurStrokeRadius.coerceAtLeast(0.5f)
     }
 
@@ -426,9 +425,54 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         var isErased = false
     }
 
+
+
+    fun setPenPreset(preset: Int) {
+        when (preset) {
+            PEN_BRUSH -> {
+                //output.minGapFactor = 0.02f
+                brushPathSettings.minPressure = 0f
+                brushPathSettings.directionBiasLevel = 0f
+            }
+            PEN_FOUNTAIN -> {
+                //output.minGapFactor = 0.02f
+                brushPathSettings.minPressure = 0.3f
+                brushPathSettings.directionBiasLevel = 0.7f
+            }
+            PEN_BALL -> {
+                //output.minGapFactor = 0.02f
+                brushPathSettings.minPressure = 0.15f
+                brushPathSettings.directionBiasLevel = 0.4f
+            }
+            TOOL_LINE -> {
+                brushPathSettings.directionBiasLevel = 0f
+            }
+        }
+        brushPathSettings.setPathSettings(mBrushPath)
+    }
+
+    inner class BrushSettings() {
+        var minGapFactor = 0.02f
+        var directionBiasVector = Pair(1f / sqrt(2f), -1f / sqrt(2f))
+        var directionBiasLevel = 1f
+        var minPressure = 0.2f
+            set(value) {
+                field = value.coerceAtLeast(0f).coerceAtMost(0.5f)
+            }
+
+        fun setPathSettings(brushPath: BrushPath) {
+            brushPath.minGapFactor = minGapFactor
+            brushPath.directionBiasVector = directionBiasVector
+            brushPath.directionBiasLevel = directionBiasLevel
+        }
+    }
+
     companion object {
         const val TOOL_PEN = 0
         const val TOOL_LINE = 1
         const val TOOL_ERASER = 2
+        const val PEN_BRUSH = 10
+        const val PEN_FOUNTAIN = 11
+        const val PEN_BALL = 12
     }
 }

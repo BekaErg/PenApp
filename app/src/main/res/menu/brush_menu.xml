@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/brush"
+        android:icon="@drawable/ic_pen"
+        android:title="Brush" />
+    <item android:id = "@+id/fountain_pen"
+        android:icon="@drawable/ic_fountainpen"
+        android:title="Fountain Pen" />
+    <item android:id="@+id/ball_pen"
+        android:icon="@drawable/ic_ballpen"
+        android:title="Ball Pen" />
+</menu>

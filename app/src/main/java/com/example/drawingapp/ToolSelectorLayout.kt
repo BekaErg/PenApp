@@ -2,9 +2,11 @@ package com.example.drawingapp
 
 import android.content.Context
 import android.util.AttributeSet
+import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import androidx.core.view.get
+import androidx.core.view.iterator
 
 class ToolSelectorLayout (context: Context, attrs: AttributeSet): LinearLayout(context, attrs) {
     companion object {
@@ -13,11 +15,13 @@ class ToolSelectorLayout (context: Context, attrs: AttributeSet): LinearLayout(c
         const val ERASER = 2
     }
 
+    private var alreadySelected = false
+
 
     var frameList = arrayListOf<FrameLayout>()
     private var mSelectedIdx = 0
 
-    var switcher: (toolType: Int) -> Unit = {}
+    var switcher: (toolType: Int, alreadySelected: Boolean, view: View) -> Unit = { _, _, _ ->}
 
     fun getTool(): Int{
         return mSelectedIdx
@@ -27,9 +31,18 @@ class ToolSelectorLayout (context: Context, attrs: AttributeSet): LinearLayout(c
         frameList[i].performClick()
     }
 
+    fun switchPen(penType: String) {
+        for (view in frameList[0]) {
+            if (view.tag == penType) {
+                view.visibility = View.VISIBLE
+            } else if (view.tag != "background"){
+                view.visibility = View.INVISIBLE
+            }
+        }
+    }
+
     init {
         inflate(context, R.layout.drawing_tools, this)
-
         frameList.add(findViewById(R.id.pen_frame))
         frameList.add(findViewById(R.id.line_frame))
         frameList.add(findViewById(R.id.eraser_icon))
@@ -37,10 +50,10 @@ class ToolSelectorLayout (context: Context, attrs: AttributeSet): LinearLayout(c
 
         for (i in 0 until frameList.size) {
             frameList[i].setOnClickListener(){
-                mSelectedIdx = i
                 deselectAll()
                 frameList[i][0].visibility = VISIBLE
-                switcher(i)
+                switcher(i, mSelectedIdx == i, it)
+                mSelectedIdx = i
             }
         }
     }
