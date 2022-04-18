@@ -9,29 +9,57 @@ import androidx.core.view.get
 import androidx.core.view.iterator
 
 class ToolSelectorLayout (context: Context, attrs: AttributeSet): LinearLayout(context, attrs) {
-    companion object {
-        const val PEN = 0
-        const val LINE = 1
-        const val ERASER = 2
-    }
-
-    private var alreadySelected = false
-
+    private var selectedTool = ToolType.BRUSH
+    private var selectedPen = ToolType.BRUSH
 
     var frameList = arrayListOf<FrameLayout>()
-    private var mSelectedIdx = 0
+    private var mSelectedToolGroup = 0
+        set(value) {
+            field = value
+            when (value) {
+                1 -> {
+                    selectedTool = ToolType.LINE
+                }
+                2 -> {
+                    selectedTool = ToolType.TOOL_ERASER
+                }
+            }
+        }
 
-    var switcher: (toolType: Int, alreadySelected: Boolean, view: View) -> Unit = { _, _, _ ->}
+    var switcher: (selectedTool: ToolType, toolGroup: Int, alreadySelected: Boolean, view: View) -> Unit = { _, _, _, _ ->}
 
-    fun getTool(): Int{
-        return mSelectedIdx
-    }
-    fun setTool(i: Int) {
+    fun setTool(toolType : ToolType) {
+        selectedTool = toolType
+        val i = when (toolType) {
+            ToolType.BRUSH -> {
+                selectedPen = toolType
+                switchPen("brush")
+                0
+            }
+            ToolType.PEN_BALL -> {
+                selectedPen = toolType
+                switchPen("ball_pen")
+                0
+            }
+            ToolType.PEN_FOUNTAIN -> {
+                selectedPen = toolType
+                switchPen("fountain_pen")
+                0
+            }
+            ToolType.LINE -> {
+                frameList[1].performClick()
+                1
+            }
+            ToolType.TOOL_ERASER -> {
+                frameList[2].performClick()
+                2
+            }
+        }
+        mSelectedToolGroup = i
         //mSelectedIdx = i
-        frameList[i].performClick()
     }
 
-    fun switchPen(penType: String) {
+    private fun switchPen(penType: String) {
         for (view in frameList[0]) {
             if (view.tag == penType) {
                 view.visibility = View.VISIBLE
@@ -46,14 +74,16 @@ class ToolSelectorLayout (context: Context, attrs: AttributeSet): LinearLayout(c
         frameList.add(findViewById(R.id.pen_frame))
         frameList.add(findViewById(R.id.line_frame))
         frameList.add(findViewById(R.id.eraser_icon))
-        frameList[mSelectedIdx][0].visibility = VISIBLE
+        frameList[mSelectedToolGroup][0].visibility = VISIBLE
 
         for (i in 0 until frameList.size) {
             frameList[i].setOnClickListener(){
                 deselectAll()
                 frameList[i][0].visibility = VISIBLE
-                switcher(i, mSelectedIdx == i, it)
-                mSelectedIdx = i
+                val alreadySelected = mSelectedToolGroup == i
+                mSelectedToolGroup = i
+                if (i == 0) selectedTool = selectedPen
+                switcher(selectedTool, i, alreadySelected, it)
             }
         }
     }

@@ -5,7 +5,7 @@ import android.util.Log
 import kotlin.math.absoluteValue
 import kotlin.math.sqrt
 
-class BrushPath {
+class PenPath {
     var minGapFactor = 0.2f
     var contourPath = Path()
 
@@ -32,6 +32,11 @@ class BrushPath {
             field = value.coerceAtLeast(0f).coerceAtMost(1f)
         }
 
+    var inputBufferSize = 4
+        set(value) {
+            field = value.coerceAtLeast(1).coerceAtMost(200)
+        }
+
     private var curX = 0f
     private var curY = 0f
     private var prevX = 0f
@@ -40,7 +45,7 @@ class BrushPath {
     private var mRadius = 0f
     private var mPrevRadius = 0f
     private val pos = floatArrayOf(0f, 0f)
-    private val inputBufferSize = 4
+
 
     private var smoothLevel = 1
     private var mPathMeasure = PathMeasure()
@@ -111,8 +116,8 @@ lineToImpl(inputBuffer.last().first, inputBuffer.last().second, inputBuffer.last
      */
     fun draw(canvas : Canvas, paint : Paint, preformanceBooster : Boolean = true) {
         canvas.drawPath(contourPath, paint)
-        for ((x, y, r) in inputBuffer) {
-            canvas.drawCircle(x, y, r, paint)
+        for ((x, y, _) in inputBuffer) {
+            canvas.drawCircle(x, y, mRadius, paint)
         }
     }
 
@@ -165,7 +170,6 @@ lineToImpl(inputBuffer.last().first, inputBuffer.last().second, inputBuffer.last
                 quadSmooth(level, 1)
             }
             SmoothType.UPSCALE -> {
-                val temp = minGapFactor
                 quadSmooth(1, level)
             }
             SmoothType.DOWNSAMPLE -> {
@@ -341,7 +345,7 @@ lineToImpl(inputBuffer.last().first, inputBuffer.last().second, inputBuffer.last
     }
 
     private fun calculateBias(x : Float, y : Float) : Float {
-        return (x * directionBiasVector.first + y * directionBiasVector.second) * directionBiasLevel + 2f - directionBiasLevel
+        return 0.5f* ((x * directionBiasVector.first + y * directionBiasVector.second) * directionBiasLevel + 2f - directionBiasLevel)
     }
 
 

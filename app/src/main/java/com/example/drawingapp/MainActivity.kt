@@ -118,18 +118,19 @@ class MainActivity : AppCompatActivity(){
             when (it.itemId) {
                 R.id.brush -> {
                     //Toast.makeText(this, "brush", Toast.LENGTH_SHORT).show()
-                    toolSelector.switchPen("brush")
-                    drawView.setPenPreset(DrawView.PEN_BRUSH)
+                    //toolSelector.switchPen("brush")
+                    toolSelector.setTool(ToolType.BRUSH)
+                    drawView.selectedTool = ToolType.BRUSH
                     true
                 }
                 R.id.fountain_pen -> {
-                    toolSelector.switchPen("fountain_pen")
-                    drawView.setPenPreset(DrawView.PEN_FOUNTAIN)
+                    toolSelector.setTool(ToolType.PEN_FOUNTAIN)
+                    drawView.selectedTool = ToolType.PEN_FOUNTAIN
                     true
                 }
                 R.id.ball_pen -> {
-                    drawView.setPenPreset(DrawView.PEN_BALL)
-                    toolSelector.switchPen("ball_pen")
+                    drawView.selectedTool = ToolType.PEN_BALL
+                    toolSelector.setTool(ToolType.PEN_BALL)
                     true
                 }
                 else -> {
@@ -138,12 +139,22 @@ class MainActivity : AppCompatActivity(){
             }
         }
 
-        val menuHelper = MenuPopupHelper(this,  popup.menu as MenuBuilder, v);
-        menuHelper.setForceShowIcon(true);
-        menuHelper.show();
+        val menuHelper = MenuPopupHelper(this,  popup.menu as MenuBuilder, v)
+        menuHelper.setForceShowIcon(true)
+        menuHelper.show()
 
     }
 
+    override fun onStart() {
+        super.onStart()
+        activityIsRunning = true
+    }
+
+    override fun onStop() {
+        super.onStop()
+        activityIsRunning = false
+        saveDrawingParams()
+    }
 
     private fun loadBitmap() {
         pickPhotoLauncher.launch("image/*")
@@ -155,7 +166,6 @@ class MainActivity : AppCompatActivity(){
         startActivityForResult(pickPhotoIntent, 0)
          */
     }
-
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         val inflater: MenuInflater = menuInflater
@@ -170,7 +180,6 @@ class MainActivity : AppCompatActivity(){
                 savePhotoLauncher.launch(name)
                 true
             }
-
             R.id.lock_zoom -> {
                 item.isChecked = !item.isChecked
                 binding.canvasContainer.lockZoom = item.isChecked
@@ -196,16 +205,6 @@ class MainActivity : AppCompatActivity(){
         }
     }
 
-    override fun onStart() {
-        super.onStart()
-        activityIsRunning = true
-    }
-
-    override fun onStop() {
-        super.onStop()
-        activityIsRunning = false
-        saveDrawingParams()
-    }
 
     override fun onWindowFocusChanged(hasFocus : Boolean) {
         super.onWindowFocusChanged(hasFocus)
@@ -229,9 +228,7 @@ class MainActivity : AppCompatActivity(){
 
         //drawView = binding.canvasContainer
         drawView = DrawView(this)
-        //drawView.layoutParams = ViewGroup.LayoutParams(200, 333)
         drawView.setBackgroundColor(Color.WHITE)
-
 
         binding.canvasContainer.addView(drawView)
         //binding.canvasContainer.addView(View(this))
@@ -241,7 +238,7 @@ class MainActivity : AppCompatActivity(){
         val sharedPreferences = getSharedPreferences(SHARED_PREFS, MODE_PRIVATE)
         parametersAdapter.copyFromDrawView(drawView)
         parametersAdapter.copyFromPalette(colorPalette)
-        parametersAdapter.copyFromToolSelector(toolSelector)
+        //parametersAdapter.copyFromToolSelector(toolSelector)
 
         val json = Gson().toJson(parametersAdapter)
         val editor = sharedPreferences.edit()
@@ -250,7 +247,6 @@ class MainActivity : AppCompatActivity(){
     }
 
     private fun loadDrawingParams() {
-        //TODO first loading crashes
         val sharedPreferences = getSharedPreferences(SHARED_PREFS, MODE_PRIVATE)
 
         val json = sharedPreferences.getString("drawingParameters", "")
@@ -260,8 +256,7 @@ class MainActivity : AppCompatActivity(){
         parametersAdapter.copyToBrushSlider(brushSlider)
         parametersAdapter.copyToColorPalette(colorPalette)
         parametersAdapter.copyToDrawView(drawView)
-        parametersAdapter.copyToTool(toolSelector)
-
+        //parametersAdapter.copyToTool(toolSelector)
     }
 
     private fun selectColor() {
@@ -277,16 +272,13 @@ class MainActivity : AppCompatActivity(){
             drawView.brushColor = cur
             colorPalette.invalidate()
         }
-
     }
 
     private fun selectTool() {
-
         toolSelector.switcher = {
-            tool, alreadySelected, view ->
+            tool, toolGroup, alreadySelected, view ->
             drawView.selectedTool = tool
-            //TODO Figure out why I can not run penSelectorMenu
-            if (activityIsRunning && alreadySelected && tool == ToolSelectorLayout.PEN) {
+            if (activityIsRunning && alreadySelected && toolGroup == 0) {
                 penSelectorMenu(this@MainActivity, view)
                 //binding.popUpButton.performClick()
                 //penSelectorMenu(binding.popUpButton)
@@ -343,8 +335,6 @@ class MainActivity : AppCompatActivity(){
             }
 
         )
-
-
     }
 
     private fun changeVisibility(view: View) {
@@ -365,8 +355,6 @@ class MainActivity : AppCompatActivity(){
         }
     }
 
-
-
     private fun allInvisible() {
         brushSlider.visibility = View.INVISIBLE
         colorPicker.visibility = View.INVISIBLE
@@ -374,16 +362,15 @@ class MainActivity : AppCompatActivity(){
         moreOptions.visibility = View.INVISIBLE
     }
 
-
     private inner class ParametersAdapter {
         var strokeSize = 10f
         var colorList = arrayListOf(Color.RED, Color.GREEN, Color.BLUE)
         var colorIdx = 0
-        var tool = ToolSelectorLayout.PEN
+        //var tool = ToolTypes.BRUSH
 
         fun copyToDrawView(drawView: DrawView) {
             drawView.strokeSize = strokeSize
-            drawView.selectedTool = tool
+            //drawView.selectedTool = tool
             drawView.brushColor = colorList[colorIdx]
         }
 
@@ -394,6 +381,7 @@ class MainActivity : AppCompatActivity(){
             }
             palette.selectedIdx = colorIdx
         }
+        /*
         fun copyToTool(toolSelector: ToolSelectorLayout){
             toolSelector.setTool(tool)
             //Todo why does using parent class members cause an error (commenting Gson in loadParameters fixes)
@@ -403,21 +391,25 @@ class MainActivity : AppCompatActivity(){
             */
         }
 
+         */
+
         fun copyToBrushSlider(view: Slider) {
             view.value = strokeSize
         }
 
         fun copyFromDrawView(drawView: DrawView) {
             strokeSize = drawView.strokeSize
-            tool = drawView.selectedTool
+            //tool = drawView.selectedTool
         }
         fun copyFromPalette(palette : ColorPalette) {
             colorList = palette.getColors()
             colorIdx = palette.selectedIdx
         }
+        /*
         fun copyFromToolSelector(toolSelector: ToolSelectorLayout) {
             tool = toolSelector.getTool()
         }
+         */
 
     }
 
