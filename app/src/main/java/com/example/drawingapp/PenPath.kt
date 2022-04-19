@@ -7,7 +7,7 @@ import kotlin.math.sqrt
 
 class PenPath {
     var minGapFactor = 0.2f
-    var contourPath = Path()
+    val contourPath = Path()
 
     /**
      * The path thickness depends on direction of the movement
@@ -31,10 +31,14 @@ class PenPath {
         set(value) {
             field = value.coerceAtLeast(0f).coerceAtMost(1f)
         }
-
+    /**
+     * RealTime smoothing by averaging last inputBufferSize points into one
+     * Useful to reduce input jitter and smoothen strokes
+     * Values lower than 5 do not have significant disadvantages
+     */
     var inputBufferSize = 4
         set(value) {
-            field = value.coerceAtLeast(1).coerceAtMost(200)
+            field = value.coerceAtLeast(1).coerceAtMost(100)
         }
 
     private var curX = 0f
@@ -47,7 +51,7 @@ class PenPath {
     private val pos = floatArrayOf(0f, 0f)
 
 
-    private var smoothLevel = 1
+    //private var smoothLevel = 1
     private var mPathMeasure = PathMeasure()
     private var arr = mutableListOf<Triple<Float, Float, Float>>()
     private var inputBuffer : ArrayDeque<Triple<Float, Float, Float>> = ArrayDeque()
@@ -66,6 +70,7 @@ class PenPath {
         inputBuffer.addLast(Triple(x, y, radius))
         if (inputBuffer.size > inputBufferSize) inputBuffer.removeFirst()
 
+        //calculate average of all points in buffer and pass it to lineTo implementation
         val (sumX, sumY, sumRad) = inputBuffer.fold(Triple(0f, 0f, 0f)) { acc, value ->
             Triple(
                 acc.first + value.first,
@@ -81,10 +86,16 @@ class PenPath {
         )
     }
 
-    fun finish() {
-/*
-lineToImpl(inputBuffer.last().first, inputBuffer.last().second, inputBuffer.last().third, true)
-*/
+    /**
+     * Unloads buffer and adds to the path.
+     * Only needed if inputBufferSize > 1
+     */
+    fun finish(addOnlyLast: Boolean = true) {
+        if (addOnlyLast) {
+            lineToImpl(inputBuffer.last().first, inputBuffer.last().second, inputBuffer.last().third, true)
+            inputBuffer.clear()
+            return
+        }
         var (sumX, sumY, sumRad) = inputBuffer.fold(Triple(0f, 0f, 0f)) { acc, value ->
             Triple(
                 acc.first + value.first,
@@ -105,7 +116,6 @@ lineToImpl(inputBuffer.last().first, inputBuffer.last().second, inputBuffer.last
             )
         }
         inputBuffer.clear()
-        Log.i("gela", "$arr")
     }
 
     /**
@@ -114,8 +124,9 @@ lineToImpl(inputBuffer.last().first, inputBuffer.last().second, inputBuffer.last
      * use smoothEffect makes drawing of the path feel more responsive
      * Only recommended to turn of smoothEffect when the paint is translucent
      */
-    fun draw(canvas : Canvas, paint : Paint, preformanceBooster : Boolean = true) {
+    fun draw(canvas : Canvas, paint : Paint, realTimePreview: Boolean = true) {
         canvas.drawPath(contourPath, paint)
+        if (!realTimePreview) return
         for ((x, y, _) in inputBuffer) {
             canvas.drawCircle(x, y, mRadius, paint)
         }
@@ -143,7 +154,8 @@ lineToImpl(inputBuffer.last().first, inputBuffer.last().second, inputBuffer.last
     }
 
     /**
-     * similar to Path.transform
+     * Transforms the path according to the transformation Matrix
+     * Does not change thickness of path
      */
     fun transform(matrix : Matrix) {
         if (arr.isEmpty()) return
@@ -169,7 +181,7 @@ lineToImpl(inputBuffer.last().first, inputBuffer.last().second, inputBuffer.last
             SmoothType.QUADRATIC -> {
                 quadSmooth(level, 1)
             }
-            SmoothType.UPSCALE -> {
+            SmoothType.UPSAMPLE -> {
                 quadSmooth(1, level)
             }
             SmoothType.DOWNSAMPLE -> {
@@ -189,8 +201,6 @@ lineToImpl(inputBuffer.last().first, inputBuffer.last().second, inputBuffer.last
         if (level <= 0) {
             return
         }
-        smoothLevel = level
-
         mPrevRadius = arr[0].third
         prevX = arr[0].first
         prevY = arr[0].second
@@ -213,7 +223,7 @@ lineToImpl(inputBuffer.last().first, inputBuffer.last().second, inputBuffer.last
             curArc.moveTo(prevX, prevY)
             curArc.quadTo(anchorX, anchorY, curX, curY)
             mPathMeasure.setPath(curArc, false)
-            subdivide(upscaleFactor * smoothLevel, mPrevRadius, mRadius, newArr)
+            subdivide(upscaleFactor * level, mPrevRadius, mRadius, newArr)
 
             mPrevRadius = mRadius
             prevX = curX
@@ -250,16 +260,16 @@ lineToImpl(inputBuffer.last().first, inputBuffer.last().second, inputBuffer.last
         }
     }
 
+    //function used in postSmooth
     private fun slidingAverage(windowSize : Int, downSampleFactor : Int) {
         if (arr.size < 2) return
         //Adding downSampleFactor copies of the last point
-        //To avoid shifting of it
-        Log.i("gela", "pre  arr.size: ${arr}")
+        //To avoid shifting of the last point
         for (i in 0 until downSampleFactor - 1) {
             val x = arr.last()
             arr.add(Triple(x.first, x.second, x.third))
         }
-        Log.i("gela", "post: ${arr}")
+
         val temp = mutableListOf<Triple<Float, Float, Float>>()
         for (i in 0 until arr.size step downSampleFactor) {
             val l = (i - windowSize).coerceAtLeast(0)
@@ -280,9 +290,8 @@ lineToImpl(inputBuffer.last().first, inputBuffer.last().second, inputBuffer.last
 
     //helper function for moveTo()
     private fun extendContour() {
-//assert(norm == sqrt((curX - prevX) * (curX - prevX) + (curY - prevY) * (curY - prevY)))
-        val dx = (curX - prevX) / norm //* 0.5f
-        val dy = (curY - prevY) / norm //* 2f
+        val dx = (curX - prevX) / norm
+        val dy = (curY - prevY) / norm
         val cosTheta = -(mRadius - mPrevRadius) / norm
         val sinTheta = sqrt(1 - cosTheta * cosTheta)
 
@@ -291,15 +300,14 @@ lineToImpl(inputBuffer.last().first, inputBuffer.last().second, inputBuffer.last
         val rightUnitX = dx * cosTheta - dy * sinTheta
         val rightUnitY = dx * sinTheta + dy * cosTheta
 
+        //If one circle is inside another, skip the process
         if (norm > (mRadius - mPrevRadius).absoluteValue) {
-            //Log.i("gela", "${arr.size}")
             contourPath.moveTo(prevX + leftUnitX * mPrevRadius, prevY + leftUnitY * mPrevRadius)
             contourPath.lineTo(prevX + rightUnitX * mPrevRadius, prevY + rightUnitY * mPrevRadius)
             contourPath.lineTo(curX + rightUnitX * mRadius, curY + rightUnitY * mRadius)
             contourPath.lineTo(curX + leftUnitX * mRadius, curY + leftUnitY * mRadius)
             contourPath.close()
         }
-//contourPath.addOval(curX - mRadius * 2f, curY - mRadius * 0.5f, curX + mRadius * 2f, curY + mRadius * 0.5f, Path.Direction.CCW)
         contourPath.addCircle(curX, curY, mRadius, Path.Direction.CCW)
     }
 
@@ -327,7 +335,7 @@ lineToImpl(inputBuffer.last().first, inputBuffer.last().second, inputBuffer.last
         } else {
             radius
         }
-        if (norm < gapFactor * mRadius) {
+        if (norm < gapFactor * mRadius + 0.4f) {
             return
         }
 
@@ -355,7 +363,7 @@ lineToImpl(inputBuffer.last().first, inputBuffer.last().second, inputBuffer.last
     enum class SmoothType {
         SLIDING_AVERAGE,
         QUADRATIC,
-        UPSCALE,
+        UPSAMPLE,
         DOWNSAMPLE,
     }
 

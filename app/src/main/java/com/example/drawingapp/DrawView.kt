@@ -1,5 +1,6 @@
 package com.example.drawingapp
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
@@ -23,6 +24,12 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     var opacity = 1f
     var penMode = true
     var penPathSettings = BrushSettings()
+    var fillType = Paint.Style.FILL_AND_STROKE
+        set(value) {
+            mPaint.style = value
+            field = value
+            redrawEverything()
+        }
 
     private var mCanvas = Canvas()
     private var mFrameCanvas = Canvas()
@@ -45,7 +52,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
 
     private var mPaint = Paint().apply {
         isAntiAlias = true
-        style = Paint.Style.FILL
+        style = fillType
         strokeWidth = 0.5f
         strokeJoin = Paint.Join.ROUND
         strokeCap = Paint.Cap.ROUND
@@ -129,6 +136,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         return super.onGenericMotionEvent(event)
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event : MotionEvent) : Boolean {
         if (event.pointerCount > 1 && drawingStarted) {
             cancelStroke()
@@ -176,11 +184,6 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                 startStroke(event.getPressure(0))
             }
             MotionEvent.ACTION_MOVE -> {
-
-                /*
-                applyPressure(event.getPressure(0))
-                mBrushPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
-                */
                 for (i in 0 until event.historySize) {
                     mCurTouchX = event.getHistoricalX(i)
                     mCurTouchY = event.getHistoricalY(i)
@@ -193,6 +196,8 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
 
             }
             MotionEvent.ACTION_UP -> {
+                applyPressure(event.getPressure(0))
+                mBrushPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
                 finishStroke()
             }
             MotionEvent.ACTION_CANCEL -> {
@@ -259,7 +264,6 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         drawingStarted = false
     }
 
-    //TODO Change back to pen when event.action == Cancel
     private fun erase(event : MotionEvent) : Boolean {
         when (event.action and event.actionMasked) {
             MotionEvent.ACTION_DOWN, 211 -> {
@@ -316,11 +320,13 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     }
 
     private fun applyPressure(pressure : Float) {
-        //mCurStrokeRadius = penPathSettings.minPressure * strokeSize + (0.5f - penPathSettings.minPressure) * strokeSize * (1f - (1f - pressure).pow(2))
-        //mCurStrokeRadius = penPathSettings.minPressure * strokeSize + (1f - penPathSettings.minPressure) * strokeSize * pressure
         mCurStrokeRadius = strokeSize * (
-                pressure * (1f - penPathSettings.minPressure) + penPathSettings.minPressure
+                penPathSettings.minPressure   + 0.5f * (1f - penPathSettings.minPressure) * (1f - (1f - pressure).pow(2))
                 )
+        //mCurStrokeRadius = penPathSettings.minPressure * strokeSize + (1f - penPathSettings.minPressure) * strokeSize * pressure
+        //mCurStrokeRadius = strokeSize * (
+        //        sqrt(pressure) * (1f - penPathSettings.minPressure) + penPathSettings.minPressure
+        //        )
         //mCurStrokeRadius = mCurStrokeRadius.coerceAtLeast(0.5f)
     }
 
@@ -365,25 +371,6 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         frameMatrix = matrix
         frameMatrix.invert(matrix)
         frameRectF.transform(frameMatrix)
-    }
-
-    fun getHistory(): MutableList<DrawingParameters> {
-        val arr = mutableListOf<DrawingParameters>()
-        //TODO change this to iterators
-        for (params in mStrokeHistory) {
-            if (params.toolType != ToolType.TOOL_ERASER && !params.isErased) {
-                arr.add(params)
-            }
-        }
-        return arr
-    }
-
-    fun setHistory(arr: MutableList<DrawingParameters>?) {
-        mStrokeHistory.clear()
-        if (arr == null) return
-        for (params in mStrokeHistory) {
-            mStrokeHistory.add(params)
-        }
     }
 
     fun undo() {
@@ -442,16 +429,18 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
             ToolType.BRUSH -> {
                 penPathSettings.minPressure = 0f
                 penPathSettings.directionBiasLevel = 0f
-                penPathSettings.bufferSize = 0
+                penPathSettings.bufferSize = 4
             }
             ToolType.PEN_FOUNTAIN -> {
                 penPathSettings.minPressure = 0.7f
-                penPathSettings.directionBiasLevel = 0.7f
-                penPathSettings.bufferSize = 5
+                penPathSettings.directionBiasLevel = 0.8f
+                penPathSettings.directionBiasVector = Pair(1f, -1f)
+                penPathSettings.bufferSize = 4
             }
             ToolType.PEN_BALL -> {
-                penPathSettings.minPressure = 0.3f
+                penPathSettings.minPressure = 0.25f
                 penPathSettings.directionBiasLevel = 0.4f
+                penPathSettings.directionBiasVector = Pair(0f, 1f)
                 penPathSettings.bufferSize = 3
             }
             ToolType.LINE -> {
@@ -465,7 +454,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     }
 
     inner class BrushSettings() {
-        var minGapFactor = 0.1f
+        var minGapFactor = 0.15f
         var directionBiasVector = Pair(1f / sqrt(2f), -1f / sqrt(2f))
         var directionBiasLevel = 1f
         var minPressure = 0.01f

@@ -30,5 +30,6 @@
     <string name="more_options_card">more_options_card</string>
     <string name="lock_zoom">Lock Zoom</string>
     <string name="load_image">Load Image</string>
+    <string name="show_skeleton">Show Skeleton</string>
 
 </resources>

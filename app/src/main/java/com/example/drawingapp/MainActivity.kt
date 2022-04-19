@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Paint
 import android.os.Bundle
 import android.util.Log
 import android.view.*
@@ -156,16 +157,6 @@ class MainActivity : AppCompatActivity(){
         saveDrawingParams()
     }
 
-    private fun loadBitmap() {
-        pickPhotoLauncher.launch("image/*")
-        //imageView.setImageURI(imageURI)
-        //binding.frameForCanvas.addView(imageView)
-        /*
-        val pickPhotoIntent = Intent(Intent.ACTION_PICK,
-        MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
-        startActivityForResult(pickPhotoIntent, 0)
-         */
-    }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         val inflater: MenuInflater = menuInflater
@@ -183,11 +174,16 @@ class MainActivity : AppCompatActivity(){
             R.id.lock_zoom -> {
                 item.isChecked = !item.isChecked
                 binding.canvasContainer.lockZoom = item.isChecked
-
                 true
             }
-            R.id.load_image -> {
-                loadBitmap()
+            R.id.show_skeleton -> {
+                item.isChecked = !item.isChecked
+                if (item.isChecked) {
+                    drawView.fillType = Paint.Style.STROKE
+                } else {
+                    drawView.fillType = Paint.Style.FILL
+                }
+                drawView.invalidate()
                 true
             }
             R.id.clear_canvas -> {
@@ -204,7 +200,6 @@ class MainActivity : AppCompatActivity(){
             }
         }
     }
-
 
     override fun onWindowFocusChanged(hasFocus : Boolean) {
         super.onWindowFocusChanged(hasFocus)
@@ -431,6 +426,20 @@ class MainActivity : AppCompatActivity(){
 
 
 /*
+
+
+    private fun loadBitmap() {
+        pickPhotoLauncher.launch("image/*")
+        //imageView.setImageURI(imageURI)
+        //binding.frameForCanvas.addView(imageView)
+        /*
+        val pickPhotoIntent = Intent(Intent.ACTION_PICK,
+        MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+        startActivityForResult(pickPhotoIntent, 0)
+         */
+    }
+
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ){
