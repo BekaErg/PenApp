@@ -30,11 +30,14 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
             field = value
             redrawEverything()
         }
+    var drawingEngine = DrawingEngine.LAST_SEGMENT
 
     private var mCanvas = Canvas()
     private var mFrameCanvas = Canvas()
-    lateinit var mBitmap : Bitmap
-    lateinit var mFrameBitmap : Bitmap
+    private lateinit var mBitmap : Bitmap
+    private lateinit var mFrameBitmap : Bitmap
+    private lateinit var mCurStrokeBimap : Bitmap
+    private var mCurStrokeCanvas = Canvas()
 
     private var drawingStarted = false
     private var mCurTouchX = 0f
@@ -70,6 +73,13 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
     }
 
+    private val mBlackPaint = Paint().apply {
+        isAntiAlias = true
+        style = Paint.Style.FILL_AND_STROKE
+        strokeWidth = 0.01f
+        color = Color.BLACK
+    }
+
     private var mBrushPath = PenPath()
     private var mRegion = Region()
 
@@ -80,10 +90,14 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     init {
         this.isFocusableInTouchMode = true
         this.doOnLayout {
+            mCurStrokeBimap = Bitmap.createBitmap(width, height, Bitmap.Config.ALPHA_8)
+            mCurStrokeCanvas = Canvas(mCurStrokeBimap)
             mFrameBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             mFrameCanvas = Canvas(mFrameBitmap)
             mBitmap = Bitmap.createBitmap(2 * this.width, 2 * this.height, Bitmap.Config.ARGB_8888)
             mCanvas = Canvas(mBitmap)
+
+
             frameRectF.set(0f, 0f, width.toFloat(), height.toFloat())
             container = this.parent as ZoomViewGroup
             setPenPreset(ToolType.BRUSH)
@@ -120,7 +134,13 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
 
         //draw frameCanvas
         canvas.drawBitmap(mFrameBitmap, null, frameRectF, null)
-        mBrushPath.draw(canvas, mPaint)
+        if (selectedTool == ToolType.LINE || drawingEngine == DrawingEngine.PENPATH_DRAW) {
+            mBrushPath.draw(canvas, mPaint)
+        } else {
+            canvas.drawBitmap(mCurStrokeBimap, null, frameRectF, mPaint)
+        }
+
+        //mBrushPath.draw(canvas, mPaint)
 
         //draw Eraser
         mEraserPaint.strokeWidth = 4f / scaleX
@@ -176,24 +196,27 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     }
 
     private fun drawWithPen(event : MotionEvent) : Boolean {
+        mCurStrokeCanvas.save()
+        mCurStrokeCanvas.setMatrix(matrix)
+
         if (penMode && event.getToolType(0) == MotionEvent.TOOL_TYPE_FINGER) {
             return true
         }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 startStroke(event.getPressure(0))
+                mBrushPath.drawLastSegment(mCurStrokeCanvas, mBlackPaint)
             }
             MotionEvent.ACTION_MOVE -> {
+
                 for (i in 0 until event.historySize) {
                     mCurTouchX = event.getHistoricalX(i)
                     mCurTouchY = event.getHistoricalY(i)
                     applyPressure(event.getHistoricalPressure(i))
-
                     mBrushPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
-                }
-                Log.i("gela", "radius $mCurStrokeRadius")
-                Log.i("gela", "pressure ${event.getPressure(0)}")
 
+                    mBrushPath.drawLastSegment(mCurStrokeCanvas, mBlackPaint)
+                }
             }
             MotionEvent.ACTION_UP -> {
                 applyPressure(event.getPressure(0))
@@ -205,15 +228,52 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                     cancelStroke()
                 }
             }
-            else -> return false
+            else -> {
+                mCurStrokeCanvas.restore()
+                return false
+            }
         }
+
+        mCurStrokeCanvas.restore()
         invalidate()
         return true
+    }
+
+
+    private fun startStroke(pressure : Float? = null) {
+        updatePaint(DrawingParameters())
+        if (pressure != null) {
+            applyPressure(pressure)
+        } else {
+            mCurStrokeRadius = strokeSize / 2
+        }
+        mStrokeFuture.clear()
+        mStrokeHistory.add(DrawingParameters())
+        drawingStarted = true
+        penPathSettings.setPathSettings(mBrushPath)
+        mBrushPath.moveTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
+    }
+
+    private fun finishStroke() {
+        mBrushPath.draw(mCanvas, mPaint)
+        mBrushPath.finish()
+        //mBrushPath.postSmooth(BrushPath.SmoothType.UPSCALE, 4)
+        //mFrameCanvas.drawBitmap(mCurStrokeBimap, 0f, 0f, mPaint)
+
+        mCurStrokeCanvas.drawPaint(mClearPaint)
+        mFrameCanvas.save()
+        mFrameCanvas.setMatrix(matrix)
+        mBrushPath.draw(mFrameCanvas, mPaint)
+        mFrameCanvas.restore()
+
+        mBrushPath = PenPath()
+        drawingStarted = false
     }
 
     private fun cancelStroke() {
         Log.i("gela", "stroke was cancelled")
         if (drawingStarted) {
+            mCurStrokeCanvas.drawPaint(mClearPaint)
             drawingStarted = false
         } else {
             return
@@ -234,34 +294,6 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
             }
         }
         invalidate()
-    }
-
-    private fun startStroke(pressure : Float? = null) {
-        updatePaint(DrawingParameters())
-        if (pressure != null) {
-            applyPressure(pressure)
-        } else {
-            mCurStrokeRadius = strokeSize / 2
-        }
-        mStrokeFuture.clear()
-        mStrokeHistory.add(DrawingParameters())
-        drawingStarted = true
-        penPathSettings.setPathSettings(mBrushPath)
-        mBrushPath.moveTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
-    }
-
-    private fun finishStroke() {
-        mBrushPath.draw(mCanvas, mPaint)
-        mBrushPath.finish()
-        //mBrushPath.postSmooth(BrushPath.SmoothType.UPSCALE, 4)
-
-        mFrameCanvas.save()
-        mFrameCanvas.setMatrix(matrix)
-        mBrushPath.draw(mFrameCanvas, mPaint)
-        mFrameCanvas.restore()
-
-        mBrushPath = PenPath()
-        drawingStarted = false
     }
 
     private fun erase(event : MotionEvent) : Boolean {
@@ -420,6 +452,11 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         val dynPath = mBrushPath
         val eraserIdx = mErasedIndices
         var isErased = false
+    }
+
+    enum class DrawingEngine {
+        LAST_SEGMENT,
+        PENPATH_DRAW,
     }
 
 

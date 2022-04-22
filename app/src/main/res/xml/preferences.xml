@@ -1,4 +1,5 @@
-<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
     <PreferenceCategory
         app:title="Dialogs">
         <SwitchPreference
@@ -7,7 +8,9 @@
             app:summary="Disables drawing by finger while using a pen tool"
             app:defaultValue="true"
             />
+
     </PreferenceCategory>
+
 
     <PreferenceCategory
         app:title = "About">

@@ -31,5 +31,8 @@
     <string name="lock_zoom">Lock Zoom</string>
     <string name="load_image">Load Image</string>
     <string name="show_skeleton">Show Skeleton</string>
+    <string name="drawing_engine_path">Whole Path</string>
+    <string name="drawing_engine_segment">Draw Segment</string>
+    <string name="segment_mode">Segment Mode</string>
 
 </resources>

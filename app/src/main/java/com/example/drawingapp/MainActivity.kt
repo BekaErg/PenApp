@@ -186,6 +186,15 @@ class MainActivity : AppCompatActivity(){
                 drawView.invalidate()
                 true
             }
+            R.id.segment_mode -> {
+                item.isChecked = !item.isChecked
+                drawView.drawingEngine = if (item.isChecked) {
+                    DrawView.DrawingEngine.LAST_SEGMENT
+                } else {
+                    DrawView.DrawingEngine.PENPATH_DRAW
+                }
+                true
+            }
             R.id.clear_canvas -> {
                 drawView.clearCanvas()
                 true
