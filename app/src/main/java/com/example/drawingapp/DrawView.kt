@@ -24,7 +24,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     var opacity = 1f
     var penMode = true
     var penPathSettings = BrushSettings()
-    var fillType = Paint.Style.FILL_AND_STROKE
+    var fillType = Paint.Style.FILL
         set(value) {
             mPaint.style = value
             field = value
@@ -97,6 +97,8 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
             mBitmap = Bitmap.createBitmap(2 * this.width, 2 * this.height, Bitmap.Config.ARGB_8888)
             mCanvas = Canvas(mBitmap)
 
+            mFrameBitmap.prepareToDraw()
+            mBitmap.prepareToDraw()
 
             frameRectF.set(0f, 0f, width.toFloat(), height.toFloat())
             container = this.parent as ZoomViewGroup
@@ -111,6 +113,51 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
             redrawEverything()
         }
 
+        if (container.multiTouchTriggered) {
+            canvas.save()
+            canvas.clipRect(0f, 0f, frameRectF.left, frameRectF.bottom)
+            canvas.drawBitmap(mBitmap, 0f, 0f, null)
+            canvas.restore()
+
+            canvas.save()
+            canvas.clipRect(frameRectF.left, 0f, this.width.toFloat(), frameRectF.top)
+            canvas.drawBitmap(mBitmap, 0f, 0f, null)
+            canvas.restore()
+
+            canvas.save()
+            canvas.clipRect(frameRectF.right, frameRectF.top, this.width.toFloat(), this.height.toFloat())
+            canvas.drawBitmap(mBitmap, 0f, 0f, null)
+            canvas.restore()
+
+            canvas.save()
+            canvas.clipRect(0f, frameRectF.bottom, frameRectF.right, this.height.toFloat())
+            canvas.drawBitmap(mBitmap, 0f, 0f, null)
+            canvas.restore()
+
+            canvas.drawBitmap(mFrameBitmap, null, frameRectF, null)
+        } else if (selectedTool == ToolType.TOOL_ERASER){
+            for (parameters in mStrokeHistory) {
+                if (parameters.isErased || parameters.toolType == ToolType.TOOL_ERASER) {
+                    continue
+                }
+                updatePaint(parameters)
+                //mFrameCanvas.drawPath(parameters.dynPath.contourPath, mPaint)
+                parameters.dynPath.draw(canvas, mPaint)
+            }
+            canvas.drawBitmap(mCurStrokeBimap, null, frameRectF, mPaint)
+            mEraserPaint.strokeWidth = 4f / scaleX
+            canvas.drawPath(mEraser, mEraserPaint)
+        } else {
+            canvas.drawBitmap(mFrameBitmap, null, frameRectF, null)
+            canvas.drawBitmap(mCurStrokeBimap, null, frameRectF, mPaint)
+        }
+
+        //mFrameCanvas.drawPaint(mClearPaint)
+
+        //canvas.drawBitmap(mFrameBitmap, 0f, 0f, null)
+
+
+        /*
         //Alternative to all this is clipOutRectangle, only working from API 26
         canvas.save()
         canvas.clipRect(0f, 0f, frameRectF.left, frameRectF.bottom)
@@ -132,19 +179,24 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         canvas.drawBitmap(mBitmap, 0f, 0f, null)
         canvas.restore()
 
+         */
+
         //draw frameCanvas
+        /*
         canvas.drawBitmap(mFrameBitmap, null, frameRectF, null)
         if (selectedTool == ToolType.LINE || drawingEngine == DrawingEngine.PENPATH_DRAW) {
             mBrushPath.draw(canvas, mPaint)
         } else {
             canvas.drawBitmap(mCurStrokeBimap, null, frameRectF, mPaint)
         }
+         */
 
         //mBrushPath.draw(canvas, mPaint)
 
         //draw Eraser
-        mEraserPaint.strokeWidth = 4f / scaleX
-        canvas.drawPath(mEraser, mEraserPaint)
+
+
+
     }
 
     override fun onGenericMotionEvent(event : MotionEvent) : Boolean {
@@ -248,15 +300,17 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
             mCurStrokeRadius = strokeSize / 2
         }
         mStrokeFuture.clear()
-        mStrokeHistory.add(DrawingParameters())
+        //mStrokeHistory.add(DrawingParameters())
         drawingStarted = true
         penPathSettings.setPathSettings(mBrushPath)
         mBrushPath.moveTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
     }
 
     private fun finishStroke() {
+
         mBrushPath.draw(mCanvas, mPaint)
         mBrushPath.finish()
+        mStrokeHistory.add(DrawingParameters())
         //mBrushPath.postSmooth(BrushPath.SmoothType.UPSCALE, 4)
         //mFrameCanvas.drawBitmap(mCurStrokeBimap, 0f, 0f, mPaint)
 
@@ -319,6 +373,8 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                     selectedTool = toolBackUp
                 }
                 drawingStarted = false
+                invalidate()
+                redrawEverything()
             }
             else -> return false
         }
@@ -344,7 +400,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                 drawingStarted = true
                 parameters.isErased = true
                 mErasedIndices.add(i)
-                redrawEverything()
+                //redrawEverything()
                 invalidate()
                 //mStrokeHistory.add(DrawingParameters())
             }
@@ -369,13 +425,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         mPaint.alpha = (parameters.alpha * 255).toInt()
     }
 
-    private fun redrawEverything() {
-        val pathMatrix = Matrix()
-        //pathMatrix.setScale(2f, 0.5f, width.toFloat() / 2, height.toFloat() / 2)
-        pathMatrix.setRotate(45f, width.toFloat() / 2, height.toFloat() / 2)
-
-        Log.i("gela", "refreshed")
-        //draw on current Portion of the frame
+    private fun redrawFrame() {
         mFrameCanvas.drawPaint(mClearPaint)
         mFrameCanvas.save()
         mFrameCanvas.setMatrix(matrix)
@@ -388,16 +438,32 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
             parameters.dynPath.draw(mFrameCanvas, mPaint)
         }
         mFrameCanvas.restore()
+    }
 
-        //draw on a whole bitmap
+    private fun redrawEverything() {
+        val pathMatrix = Matrix()
+        //pathMatrix.setScale(2f, 0.5f, width.toFloat() / 2, height.toFloat() / 2)
+
+        Log.i("gela", "refreshed")
+        //draw on current Portion of the frame
+        mFrameCanvas.drawPaint(mClearPaint)
+        mFrameCanvas.save()
+        mFrameCanvas.setMatrix(matrix)
+
         mCanvas.drawPaint(mClearPaint)
+
         for (parameters in mStrokeHistory) {
             if (parameters.isErased || parameters.toolType == ToolType.TOOL_ERASER) {
                 continue
             }
             updatePaint(parameters)
+            //parameters.dynPath.transform(pathMatrix)
+            parameters.dynPath.draw(mFrameCanvas, mPaint)
             parameters.dynPath.draw(mCanvas, mPaint)
+
         }
+        mFrameCanvas.restore()
+
         //Prepare frame for drawing
         frameRectF.set(0f, 0f, width.toFloat(), height.toFloat())
         frameMatrix = matrix
@@ -491,7 +557,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     }
 
     inner class BrushSettings() {
-        var minGapFactor = 0.15f
+        var minGapFactor = 0.015f
         var directionBiasVector = Pair(1f / sqrt(2f), -1f / sqrt(2f))
         var directionBiasLevel = 1f
         var minPressure = 0.01f
