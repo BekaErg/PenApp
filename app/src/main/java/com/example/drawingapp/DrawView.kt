@@ -28,16 +28,17 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         set(value) {
             mPaint.style = value
             field = value
-            redrawEverything()
+            redrawEverything(true)
         }
     var drawingEngine = DrawingEngine.LAST_SEGMENT
 
-    private var mCanvas = Canvas()
+    private var mGlobalCanvas = Canvas()
     private var mFrameCanvas = Canvas()
-    private lateinit var mBitmap : Bitmap
+    private lateinit var mGlobalBitmap : Bitmap
     private lateinit var mFrameBitmap : Bitmap
     private lateinit var mCurStrokeBimap : Bitmap
     private var mCurStrokeCanvas = Canvas()
+    private var mBoundaryRect = RectF()
 
     private var drawingStarted = false
     private var mCurTouchX = 0f
@@ -94,11 +95,11 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
             mCurStrokeCanvas = Canvas(mCurStrokeBimap)
             mFrameBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             mFrameCanvas = Canvas(mFrameBitmap)
-            mBitmap = Bitmap.createBitmap(2 * this.width, 2 * this.height, Bitmap.Config.ARGB_8888)
-            mCanvas = Canvas(mBitmap)
+            mGlobalBitmap = Bitmap.createBitmap(2 * this.width, 2 * this.height, Bitmap.Config.ARGB_8888)
+            mGlobalCanvas = Canvas(mGlobalBitmap)
 
             mFrameBitmap.prepareToDraw()
-            mBitmap.prepareToDraw()
+            mGlobalBitmap.prepareToDraw()
 
             frameRectF.set(0f, 0f, width.toFloat(), height.toFloat())
             container = this.parent as ZoomViewGroup
@@ -110,28 +111,28 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         super.onDraw(canvas)
         if (container.multiTouchEnded) {
             container.multiTouchEnded = false
-            redrawEverything()
+            redrawEverything(false)
         }
 
         if (container.multiTouchTriggered) {
             canvas.save()
             canvas.clipRect(0f, 0f, frameRectF.left, frameRectF.bottom)
-            canvas.drawBitmap(mBitmap, 0f, 0f, null)
+            canvas.drawBitmap(mGlobalBitmap, 0f, 0f, null)
             canvas.restore()
 
             canvas.save()
             canvas.clipRect(frameRectF.left, 0f, this.width.toFloat(), frameRectF.top)
-            canvas.drawBitmap(mBitmap, 0f, 0f, null)
+            canvas.drawBitmap(mGlobalBitmap, 0f, 0f, null)
             canvas.restore()
 
             canvas.save()
             canvas.clipRect(frameRectF.right, frameRectF.top, this.width.toFloat(), this.height.toFloat())
-            canvas.drawBitmap(mBitmap, 0f, 0f, null)
+            canvas.drawBitmap(mGlobalBitmap, 0f, 0f, null)
             canvas.restore()
 
             canvas.save()
             canvas.clipRect(0f, frameRectF.bottom, frameRectF.right, this.height.toFloat())
-            canvas.drawBitmap(mBitmap, 0f, 0f, null)
+            canvas.drawBitmap(mGlobalBitmap, 0f, 0f, null)
             canvas.restore()
 
             canvas.drawBitmap(mFrameBitmap, null, frameRectF, null)
@@ -149,39 +150,13 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
             canvas.drawPath(mEraser, mEraserPaint)
         } else {
             canvas.drawBitmap(mFrameBitmap, null, frameRectF, null)
-            canvas.drawBitmap(mCurStrokeBimap, null, frameRectF, mPaint)
+            if (selectedTool == ToolType.LINE || drawingEngine == DrawingEngine.PENPATH_DRAW) {
+                mBrushPath.draw(canvas, mPaint)
+            } else {
+                canvas.drawBitmap(mCurStrokeBimap, null, frameRectF, mPaint)
+            }
         }
 
-        //mFrameCanvas.drawPaint(mClearPaint)
-
-        //canvas.drawBitmap(mFrameBitmap, 0f, 0f, null)
-
-
-        /*
-        //Alternative to all this is clipOutRectangle, only working from API 26
-        canvas.save()
-        canvas.clipRect(0f, 0f, frameRectF.left, frameRectF.bottom)
-        canvas.drawBitmap(mBitmap, 0f, 0f, null)
-        canvas.restore()
-
-        canvas.save()
-        canvas.clipRect(frameRectF.left, 0f, this.width.toFloat(), frameRectF.top)
-        canvas.drawBitmap(mBitmap, 0f, 0f, null)
-        canvas.restore()
-
-        canvas.save()
-        canvas.clipRect(frameRectF.right, frameRectF.top, this.width.toFloat(), this.height.toFloat())
-        canvas.drawBitmap(mBitmap, 0f, 0f, null)
-        canvas.restore()
-
-        canvas.save()
-        canvas.clipRect(0f, frameRectF.bottom, frameRectF.right, this.height.toFloat())
-        canvas.drawBitmap(mBitmap, 0f, 0f, null)
-        canvas.restore()
-
-         */
-
-        //draw frameCanvas
         /*
         canvas.drawBitmap(mFrameBitmap, null, frameRectF, null)
         if (selectedTool == ToolType.LINE || drawingEngine == DrawingEngine.PENPATH_DRAW) {
@@ -308,13 +283,14 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
 
     private fun finishStroke() {
 
-        mBrushPath.draw(mCanvas, mPaint)
+        mBrushPath.draw(mGlobalCanvas, mPaint)
         mBrushPath.finish()
         mStrokeHistory.add(DrawingParameters())
         //mBrushPath.postSmooth(BrushPath.SmoothType.UPSCALE, 4)
         //mFrameCanvas.drawBitmap(mCurStrokeBimap, 0f, 0f, mPaint)
 
         mCurStrokeCanvas.drawPaint(mClearPaint)
+
         mFrameCanvas.save()
         mFrameCanvas.setMatrix(matrix)
         mBrushPath.draw(mFrameCanvas, mPaint)
@@ -353,6 +329,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     private fun erase(event : MotionEvent) : Boolean {
         when (event.action and event.actionMasked) {
             MotionEvent.ACTION_DOWN, 211 -> {
+                mBoundaryRect = RectF(0f, 0f, 0f, 0f)
                 Log.i("gela","action down: $selectedTool")
                 mEraser.addCircle(mCurTouchX, mCurTouchY, mEraserRadius, Path.Direction.CW)
                 eraserHelper()
@@ -373,8 +350,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                     selectedTool = toolBackUp
                 }
                 drawingStarted = false
-                invalidate()
-                redrawEverything()
+                redrawEverything(true)
             }
             else -> return false
         }
@@ -384,6 +360,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
 
     private fun eraserHelper() {
         //Could be changed to circle for more accuracy
+
         val clip = Region(
             (mCurTouchX - mEraserRadius / scaleX).toInt(),
             (mCurTouchY - mEraserRadius / scaleX).toInt(),
@@ -400,6 +377,10 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                 drawingStarted = true
                 parameters.isErased = true
                 mErasedIndices.add(i)
+
+                Log.i("gela", "Bef $mBoundaryRect")
+                rectUnion(mBoundaryRect, parameters.dynPath.boundaryRectF)
+                Log.i("gela", "Aft $mBoundaryRect")
                 //redrawEverything()
                 invalidate()
                 //mStrokeHistory.add(DrawingParameters())
@@ -436,21 +417,28 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
             updatePaint(parameters)
             //parameters.dynPath.transform(pathMatrix)
             parameters.dynPath.draw(mFrameCanvas, mPaint)
+            parameters.dynPath.draw(mGlobalCanvas, mPaint)
         }
         mFrameCanvas.restore()
     }
 
-    private fun redrawEverything() {
-        val pathMatrix = Matrix()
-        //pathMatrix.setScale(2f, 0.5f, width.toFloat() / 2, height.toFloat() / 2)
+    private fun redrawEverything(updateGlobal: Boolean) {
+        //After Erase: updateGlobal = true and Crop
+        //After zooming: updateGlobal = false and no Crop
+        //After Redo, undo: updateGlobal = true and no Crop
 
-        Log.i("gela", "refreshed")
-        //draw on current Portion of the frame
-        mFrameCanvas.drawPaint(mClearPaint)
         mFrameCanvas.save()
+        mGlobalCanvas.save()
         mFrameCanvas.setMatrix(matrix)
-
-        mCanvas.drawPaint(mClearPaint)
+        if (mBoundaryRect != RectF(0f, 0f, 0f, 0f)) {
+            mFrameCanvas.clipRect(mBoundaryRect)
+            mGlobalCanvas.clipRect(mBoundaryRect)
+        }
+        mFrameCanvas.drawPaint(mClearPaint)
+        if (updateGlobal) {
+            mGlobalCanvas.drawPaint(mClearPaint)
+        }
+        //Log.i("gela", "$mBoundaryRect")
 
         for (parameters in mStrokeHistory) {
             if (parameters.isErased || parameters.toolType == ToolType.TOOL_ERASER) {
@@ -459,10 +447,13 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
             updatePaint(parameters)
             //parameters.dynPath.transform(pathMatrix)
             parameters.dynPath.draw(mFrameCanvas, mPaint)
-            parameters.dynPath.draw(mCanvas, mPaint)
-
+            if (updateGlobal) {
+                parameters.dynPath.draw(mGlobalCanvas, mPaint)
+            }
         }
         mFrameCanvas.restore()
+        mGlobalCanvas.restore()
+        mBoundaryRect = RectF(0f, 0f, 0f, 0f)
 
         //Prepare frame for drawing
         frameRectF.set(0f, 0f, width.toFloat(), height.toFloat())
@@ -481,7 +472,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
             }
         }
         mStrokeFuture.add(params)
-        redrawEverything()
+        redrawEverything(true)
         invalidate()
     }
 
@@ -494,13 +485,13 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                 mStrokeHistory[i].isErased = true
             }
         }
-        redrawEverything()
+        redrawEverything(true)
         invalidate()
     }
 
     fun clearCanvas() {
         mStrokeHistory.clear()
-        redrawEverything()
+        redrawEverything(true)
         invalidate()
     }
 
@@ -509,6 +500,20 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         val canvas = Canvas(bitmap!!)
         this.draw(canvas)
         return bitmap
+    }
+
+    private fun rectUnion(source: RectF, other: RectF) {
+        if (source == RectF(0f, 0f, 0f, 0f)) {
+            source.left = other.left
+            source.top = other.top
+            source.right = other.right
+            source.bottom = other.bottom
+            return
+        }
+        source.bottom = source.bottom.coerceAtLeast(other.bottom)
+        source.top = source.top.coerceAtMost(other.top)
+        source.right = source.right.coerceAtLeast(other.right)
+        source.left = source.left.coerceAtMost(other.left)
     }
 
     inner class DrawingParameters {

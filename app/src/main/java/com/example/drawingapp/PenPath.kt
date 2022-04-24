@@ -8,7 +8,13 @@ import kotlin.math.sqrt
 class PenPath {
     var minGapFactor = 0.2f
     val contourPath = Path()
-    private val mLastSegment = Path()
+    val lastSegment = Path()
+    val maxStepFactor = 0.15f
+
+    /**
+     * Rectangle bounding path (with 1px margin)
+     */
+    val boundaryRectF = RectF()
 
     /**
      * The path thickness depends on direction of the movement
@@ -138,7 +144,7 @@ class PenPath {
      * Can be used to draw infinitely large paths without performance increase
      */
     fun drawLastSegment(canvas : Canvas, paint : Paint) {
-        canvas.drawPath(mLastSegment, paint)
+        canvas.drawPath(lastSegment, paint)
     }
 
     /**
@@ -146,7 +152,7 @@ class PenPath {
      */
     fun rewind() {
         contourPath.rewind()
-        mLastSegment.rewind()
+        lastSegment.rewind()
         arr.clear()
         mPrevRadius = 0f
         inputBuffer.clear()
@@ -303,12 +309,15 @@ class PenPath {
         mRadius = (1f - directionBiasLevel) * radius
         contourPath.rewind()
         contourPath.addCircle(x, y, mRadius, Path.Direction.CCW)
-        mLastSegment.rewind()
-        mLastSegment.addCircle(x, y, mRadius, Path.Direction.CCW)
+        lastSegment.rewind()
+        lastSegment.addCircle(x, y, mRadius, Path.Direction.CCW)
 
         if (addToArr) {
             arr.add(Triple(x, y, mRadius))
+            //TODO might need some other time (after transform)
+            boundaryRectF.set(RectF(x - mRadius, y - mRadius, x + mRadius, y + mRadius))
         }
+
         Log.i("gela", "prev ${prevX}")
         prevX = x
         prevY = y
@@ -331,11 +340,17 @@ class PenPath {
 
         curX = x
         curY = y
-        mLastSegment.rewind()
+
+        lastSegment.rewind()
         extendContour()
 
         if (addToArr) {
             arr.add(Triple(x, y, mRadius))
+            //TODO might need other times as well
+            boundaryRectF.left = boundaryRectF.left.coerceAtMost(x - mRadius - 1f)
+            boundaryRectF.right = boundaryRectF.right.coerceAtLeast(x + mRadius + 1f)
+            boundaryRectF.top = boundaryRectF.top.coerceAtMost(y - mRadius - 1f)
+            boundaryRectF.bottom = boundaryRectF.bottom.coerceAtLeast(y + mRadius + 1f)
         }
 
         prevX = curX
@@ -345,32 +360,19 @@ class PenPath {
 
     //Helper function for lineToImpl
     private fun extendContour() {
-        val dx = (curX - prevX) / norm
-        val dy = (curY - prevY) / norm
-        val cosTheta = -(mRadius - mPrevRadius) / norm
-        val sinTheta = sqrt(1 - cosTheta * cosTheta)
+        val n = (
+                norm / (maxStepFactor * mRadius.coerceAtMost(mPrevRadius))
+                ).toInt() + 1
 
-        val leftUnitX = dx * cosTheta + dy * sinTheta
-        val leftUnitY = -dx * sinTheta + dy * cosTheta
-        val rightUnitX = dx * cosTheta - dy * sinTheta
-        val rightUnitY = dx * sinTheta + dy * cosTheta
-
-        //If one circle is inside another, skip the process
-        if (norm > (mRadius - mPrevRadius).absoluteValue) {
-            mLastSegment.moveTo(prevX + leftUnitX * mPrevRadius, prevY + leftUnitY * mPrevRadius)
-            mLastSegment.lineTo(prevX + rightUnitX * mPrevRadius, prevY + rightUnitY * mPrevRadius)
-            mLastSegment.lineTo(curX + rightUnitX * mRadius, curY + rightUnitY * mRadius)
-            mLastSegment.lineTo(curX + leftUnitX * mRadius, curY + leftUnitY * mRadius)
-            mLastSegment.close()
-
-            contourPath.moveTo(prevX + leftUnitX * mPrevRadius, prevY + leftUnitY * mPrevRadius)
-            contourPath.lineTo(prevX + rightUnitX * mPrevRadius, prevY + rightUnitY * mPrevRadius)
-            contourPath.lineTo(curX + rightUnitX * mRadius, curY + rightUnitY * mRadius)
-            contourPath.lineTo(curX + leftUnitX * mRadius, curY + leftUnitY * mRadius)
-            contourPath.close()
+        for (i in 1 .. n) {
+            val x = prevX + (curX - prevX) * i / n
+            val y = prevY + (curY - prevY) * i / n
+            val radius = mPrevRadius + (mRadius - mPrevRadius) * i / n
+            lastSegment.addCircle(x, y, radius, Path.Direction.CCW)
+            contourPath.addCircle(x, y, radius, Path.Direction.CCW)
         }
-        mLastSegment.addCircle(curX, curY, mRadius, Path.Direction.CCW)
-        contourPath.addCircle(curX, curY, mRadius, Path.Direction.CCW)
+
+
     }
 
     private fun calculateBias(x : Float, y : Float) : Float {
@@ -389,3 +391,35 @@ class PenPath {
     }
 
 }
+
+
+/*
+    private fun extendContour() {
+        val dx = (curX - prevX) / norm
+        val dy = (curY - prevY) / norm
+        val cosTheta = -(mRadius - mPrevRadius) / norm
+        val sinTheta = sqrt(1 - cosTheta * cosTheta)
+
+        val leftUnitX = dx * cosTheta + dy * sinTheta
+        val leftUnitY = -dx * sinTheta + dy * cosTheta
+        val rightUnitX = dx * cosTheta - dy * sinTheta
+        val rightUnitY = dx * sinTheta + dy * cosTheta
+
+        //If one circle is inside another, skip the process
+        if (norm > (mRadius - mPrevRadius).absoluteValue) {
+            lastSegment.moveTo(prevX + leftUnitX * mPrevRadius, prevY + leftUnitY * mPrevRadius)
+            lastSegment.lineTo(prevX + rightUnitX * mPrevRadius, prevY + rightUnitY * mPrevRadius)
+            lastSegment.lineTo(curX + rightUnitX * mRadius, curY + rightUnitY * mRadius)
+            lastSegment.lineTo(curX + leftUnitX * mRadius, curY + leftUnitY * mRadius)
+            lastSegment.close()
+
+            contourPath.moveTo(prevX + leftUnitX * mPrevRadius, prevY + leftUnitY * mPrevRadius)
+            contourPath.lineTo(prevX + rightUnitX * mPrevRadius, prevY + rightUnitY * mPrevRadius)
+            contourPath.lineTo(curX + rightUnitX * mRadius, curY + rightUnitY * mRadius)
+            contourPath.lineTo(curX + leftUnitX * mRadius, curY + leftUnitY * mRadius)
+            contourPath.close()
+        }
+        lastSegment.addCircle(curX, curY, mRadius, Path.Direction.CCW)
+        contourPath.addCircle(curX, curY, mRadius, Path.Direction.CCW)
+    }
+ */
