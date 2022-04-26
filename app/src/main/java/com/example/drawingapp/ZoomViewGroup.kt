@@ -79,7 +79,7 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
         if (mPointerCount  <= 1 || event.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS) {
             return true
         } else if (mPointerCount > 3 && multiTouchTriggered) {
-            multiTouchEnded = true
+            //multiTouchEnded = true
         }
         mCurX = event.getX(0)
         mCurY = event.getY(0)
@@ -95,8 +95,6 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
                     val dy = pivotY - (mCenterY + mTransY)
                     mTransX += (mCurX - mPrevX) - dx*(mScaleFactor - 1)
                     mTransY += (mCurY - mPrevY) - dy*(mScaleFactor - 1)
-                } else {
-                    multiTouchEnded = true
                 }
             }
 

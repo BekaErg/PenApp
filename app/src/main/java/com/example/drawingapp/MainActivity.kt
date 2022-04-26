@@ -29,21 +29,6 @@ import java.util.*
 
 class MainActivity : AppCompatActivity(){
 
-    private val pickPhotoLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
-    ){
-        if (it != null) {
-            val imageView = ImageView(this)
-            imageView.setImageURI(it)
-            //TODO
-            //binding.frameForCanvas.addView(imageView)
-        }
-        Snackbar.make(binding.root, "this is the URI: $it", Snackbar.LENGTH_INDEFINITE)
-            .setAction("Cancel") {
-        }.show()
-        //Toast.makeText(this, imageURI.toString(), Toast.LENGTH_SHORT).show()
-    }
-
     private val savePhotoLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument()) {
         if (it != null) {
@@ -435,6 +420,22 @@ class MainActivity : AppCompatActivity(){
 
 
 /*
+
+    private val pickPhotoLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ){
+        if (it != null) {
+            val imageView = ImageView(this)
+            imageView.setImageURI(it)
+            //TODO
+            //binding.frameForCanvas.addView(imageView)
+        }
+        Snackbar.make(binding.root, "this is the URI: $it", Snackbar.LENGTH_INDEFINITE)
+            .setAction("Cancel") {
+        }.show()
+        //Toast.makeText(this, imageURI.toString(), Toast.LENGTH_SHORT).show()
+    }
+
 
 
     private fun loadBitmap() {

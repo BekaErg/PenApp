@@ -72,7 +72,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     }
     private var mGhostPaint = Paint().apply{
         isAntiAlias = true
-        style = Paint.Style.FILL_AND_STROKE
+        style = Paint.Style.FILL
         strokeWidth = 0.5f
         //xfermode = PorterDuffXfermode(PorterDuff.Mode.LIGHTEN)
         color = 0xDDFFFFFF.toInt()
@@ -540,7 +540,6 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         LAST_SEGMENT,
         PENPATH_DRAW,
     }
-
 
 
     private fun setPenPreset(preset: ToolType) {

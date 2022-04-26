@@ -415,6 +415,7 @@ class PenPath (contourType : Type = Type.CIRCLE_SEQUENCE){
                     lastSegment.lineTo(curX + leftUnitX * mRadius, curY + leftUnitY * mRadius)
                     lastSegment.close()
                 }
+
                 lastSegment.addCircle(curX, curY, mRadius, Path.Direction.CCW)
                 contourPath.addPath(lastSegment)
             }
