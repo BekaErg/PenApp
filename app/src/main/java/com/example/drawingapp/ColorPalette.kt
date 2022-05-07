@@ -3,15 +3,13 @@ package com.example.drawingapp
 import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
-import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.Toast
 import androidx.core.view.get
 
 class ColorPalette(context: Context, attrs: AttributeSet): LinearLayout(context, attrs){
-    var frameList = arrayListOf<FrameLayout>()
+    private var frameList = arrayListOf<FrameLayout>()
     var selectedIdx = 0
         set(value){
             frameList[field][0].visibility = INVISIBLE
@@ -20,21 +18,12 @@ class ColorPalette(context: Context, attrs: AttributeSet): LinearLayout(context,
         }
 
     var secondPress = false
-    private var colorList = arrayListOf<Int>(0xFFAA0000.toInt(), 0xFF0044AA.toInt(), Color.BLACK)
+    private var colorList = arrayListOf(0xFFAA0000.toInt(), 0xFF0044AA.toInt(), Color.BLACK)
     var switcher: (color: Int) -> Unit = {}
 
     fun setColor (color: Int) {
         (frameList[selectedIdx][1] as ImageView).setColorFilter(color)
         colorList[selectedIdx] = color
-        //frameList[selectedIdx].performClick()
-    }
-
-    fun getColor (): Int {
-        return colorList[selectedIdx]
-    }
-
-    fun getColor(i: Int): Int {
-        return colorList[i]
     }
 
     fun setColors (arr: ArrayList<Int>) {
@@ -69,7 +58,7 @@ class ColorPalette(context: Context, attrs: AttributeSet): LinearLayout(context,
         frameList[selectedIdx][0].visibility = VISIBLE
 
         for (i in 0 until frameList.size) {
-            frameList[i].setOnClickListener(){
+            frameList[i].setOnClickListener{
                 secondPress = (selectedIdx == i)
                 selectedIdx = i
                 deselectAll()

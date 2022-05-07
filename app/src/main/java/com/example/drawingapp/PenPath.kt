@@ -1,21 +1,33 @@
 package com.example.drawingapp
 
 import android.graphics.*
-import android.util.Log
-import java.nio.file.attribute.AclEntryFlag
 import kotlin.math.absoluteValue
 import kotlin.math.sqrt
 
-class PenPath (contourType : Type = Type.CIRCLE_SEQUENCE){
-    var minGapFactor = 0.95f
+class PenPath (var contourType : Type = Type.CIRCLE_SEQUENCE){
+    /**
+     * Minimum distance between two path points is
+     * minGapFactor * radius
+     */
+    var minGapFactor = 0.1f
+
+    /**
+     * Only applicable when contourType is CIRCLE_SEQUENCE
+     * If the value is too high, lines look like collection of circles
+     * Maximum distance between two consecutive path points is
+     * minMaxFactor * radius
+     */
+    val maxGapFactor = 0.15f
+
+    /**
+     * The constructed path
+     */
     val contourPath = Path()
+
+    /**
+     * Part of contourPath beginning from previous last point
+     */
     val lastSegment = Path()
-    val maxStepFactor = 0.15f
-    var contourType = contourType
-        set(value) {
-            field = value
-            updateContour()
-        }
 
     /**
      * Rectangle bounding path (with 1px margin)
@@ -26,7 +38,7 @@ class PenPath (contourType : Type = Type.CIRCLE_SEQUENCE){
      * The path thickness depends on direction of the movement
      * It is thickest when moving across to the directionBiasVector
      */
-    var directionBiasVector = Pair(1f / sqrt(2f), -1f / sqrt(2f))
+    var directionBiasVector: Pair<Float, Float> = Pair(1f / sqrt(2f), -1f / sqrt(2f))
         set(value) {
             val norm = sqrt(value.first * value.first + value.second * value.second)
             field = if (norm == 0f) {
@@ -44,12 +56,13 @@ class PenPath (contourType : Type = Type.CIRCLE_SEQUENCE){
         set(value) {
             field = value.coerceAtLeast(0f).coerceAtMost(1f)
         }
+
     /**
      * RealTime smoothing by averaging last inputBufferSize points into one
      * Useful to reduce input jitter and smoothen strokes
      * Values lower than 5 do not have significant disadvantages
      */
-    var inputBufferSize = 4
+    var inputBufferSize = 3
         set(value) {
             field = value.coerceAtLeast(1).coerceAtMost(100)
         }
@@ -62,7 +75,6 @@ class PenPath (contourType : Type = Type.CIRCLE_SEQUENCE){
     private var mRadius = 0f
     private var mPrevRadius = 0f
     private val pos = floatArrayOf(0f, 0f)
-
 
     //private var smoothLevel = 1
     private var mPathMeasure = PathMeasure()
@@ -103,12 +115,7 @@ class PenPath (contourType : Type = Type.CIRCLE_SEQUENCE){
      * Unloads buffer and adds to the path.
      * Only needed if inputBufferSize > 1
      */
-    fun finish(addOnlyLast: Boolean = true) {
-        if (false && addOnlyLast) {
-            lineToImpl(inputBuffer.last().first, inputBuffer.last().second, inputBuffer.last().third, true)
-            inputBuffer.clear()
-            return
-        }
+    fun finish() {
         var (sumX, sumY, sumRad) = inputBuffer.fold(Triple(0f, 0f, 0f)) { acc, value ->
             Triple(
                 acc.first + value.first,
@@ -137,9 +144,8 @@ class PenPath (contourType : Type = Type.CIRCLE_SEQUENCE){
      * use smoothEffect makes drawing of the path feel more responsive
      * Only recommended to turn of smoothEffect when the paint is translucent
      */
-    fun draw(canvas : Canvas, paint : Paint, realTimePreview: Boolean = true) {
+    fun draw(canvas : Canvas, paint : Paint) {
         canvas.drawPath(contourPath, paint)
-        if (!realTimePreview) return
         for ((x, y, _) in inputBuffer) {
             canvas.drawCircle(x, y, mRadius, paint)
         }
@@ -192,30 +198,6 @@ class PenPath (contourType : Type = Type.CIRCLE_SEQUENCE){
         updateContour()
     }
 
-    /**
-     * Applies smoothing / upscaling / downscaling
-     * level should be from 1 to 100
-     */
-    fun postSmooth(smoothType : SmoothType, level : Int) {
-        when (smoothType) {
-            SmoothType.SLIDING_AVERAGE -> {
-                slidingAverage(level, 1)
-            }
-            SmoothType.QUADRATIC -> {
-                quadSmooth(level, 1)
-            }
-            SmoothType.UPSAMPLE -> {
-                quadSmooth(1, level)
-            }
-            SmoothType.DOWNSAMPLE -> {
-                slidingAverage(1, level)
-            }
-            SmoothType.BRUSH_SIZE_SMOOTHING -> {
-                slidingAverage(level, 1, true)
-            }
-        }
-    }
-
 
     /**
      * Smooths line by quadratic curves.
@@ -223,7 +205,7 @@ class PenPath (contourType : Type = Type.CIRCLE_SEQUENCE){
      * The resulting path will contain upscaleFactor times more vertices
      * Use-case of upscaleFactor > 1 is when the path is have been enlarged by scaling
      */
-    private fun quadSmooth(level : Int, upscaleFactor : Int = 1) {
+    fun quadSmooth(level : Int, upscaleFactor : Int = 1) {
         if (level <= 0) {
             return
         }
@@ -270,7 +252,6 @@ class PenPath (contourType : Type = Type.CIRCLE_SEQUENCE){
         for ((x, y, rad) in arr.drop(1).dropLast(0)) {
             this.lineToImpl(x, y, rad, false, 0f)
         }
-        //contourPath.op(Path(), Path.Op.UNION)
     }
 
     //subdivide path that is set to mPathMeasure into n parts.
@@ -288,40 +269,6 @@ class PenPath (contourType : Type = Type.CIRCLE_SEQUENCE){
         }
     }
 
-    //function used in postSmooth
-    private fun slidingAverage(windowSize : Int, downSampleFactor : Int, onlyBrushSmoothing: Boolean = false) {
-        if (arr.size < 2) return
-        //Adding downSampleFactor copies of the last point
-        //To avoid shifting of the last point
-        for (i in 0 until downSampleFactor - 1) {
-            val x = arr.last()
-            arr.add(Triple(x.first, x.second, x.third))
-        }
-        val n = arr.size
-        val temp = mutableListOf<Triple<Float, Float, Float>>()
-        for (i in 0 until n step downSampleFactor) {
-            val left = (windowSize * (n - i) / n).coerceAtLeast(1)
-            val right = (windowSize * (i + 1) / n).coerceAtLeast(1)
-            val l = (i - left).coerceAtLeast(0)
-            val r = (i + right).coerceAtMost(n)
-            var avgX = 0f
-            var avgY = 0f
-            var avgR = 0f
-            for (j in l until r) {
-                avgX += arr[j].first / (r - l)
-                avgY += arr[j].second / (r - l)
-                avgR += arr[j].third / (r - l)
-            }
-            if (onlyBrushSmoothing) {
-                avgX = arr[i].first
-                avgY = arr[i].second
-            }
-            temp.add(Triple(avgX, avgY, avgR))
-        }
-        arr = temp
-        updateContour()
-    }
-
     //helper function for moveTo()
     private fun moveToImpl(x : Float, y : Float, radius : Float, addToArr : Boolean) {
         mRadius = (1f - directionBiasLevel) * radius
@@ -335,7 +282,6 @@ class PenPath (contourType : Type = Type.CIRCLE_SEQUENCE){
         }
         boundaryRectF.set(RectF(x - mRadius, y - mRadius, x + mRadius, y + mRadius))
 
-        Log.i("gela", "prev ${prevX}")
         prevX = x
         prevY = y
         mPrevRadius = mRadius
@@ -354,7 +300,7 @@ class PenPath (contourType : Type = Type.CIRCLE_SEQUENCE){
             radius
         }
 
-        if (norm < gapFactor * mRadius + 0.1f) {
+        if (norm.coerceAtLeast(mRadius - mPrevRadius) < gapFactor * mRadius + 0.1f) {
             return
         }
 
@@ -386,7 +332,7 @@ class PenPath (contourType : Type = Type.CIRCLE_SEQUENCE){
         when (contourType) {
             Type.CIRCLE_SEQUENCE -> {
                 val n = (
-                        norm / (maxStepFactor * mRadius.coerceAtMost(mPrevRadius))
+                        norm / (maxGapFactor * mRadius.coerceAtMost(mPrevRadius))
                         ).toInt() + 1
                 for (i in 1 .. n) {
                     val x = prevX + (curX - prevX) * i / n
@@ -397,18 +343,18 @@ class PenPath (contourType : Type = Type.CIRCLE_SEQUENCE){
                 }
             }
             Type.JOIN_WITH_TANGENTS -> {
-                val dx = (curX - prevX) / norm
-                val dy = (curY - prevY) / norm
-                val cosTheta = -(mRadius - mPrevRadius) / norm
-                val sinTheta = sqrt(1 - cosTheta * cosTheta)
-
-                val leftUnitX = dx * cosTheta + dy * sinTheta
-                val leftUnitY = -dx * sinTheta + dy * cosTheta
-                val rightUnitX = dx * cosTheta - dy * sinTheta
-                val rightUnitY = dx * sinTheta + dy * cosTheta
-
-                //If one circle is inside another, skip the process
+                 //If one circle is inside another, skip the process
                 if (norm > (mRadius - mPrevRadius).absoluteValue) {
+                    val dx = (curX - prevX) / norm
+                    val dy = (curY - prevY) / norm
+                    val cosTheta = -(mRadius - mPrevRadius) / norm
+                    val sinTheta = sqrt(1 - cosTheta * cosTheta)
+
+                    val leftUnitX = dx * cosTheta + dy * sinTheta
+                    val leftUnitY = -dx * sinTheta + dy * cosTheta
+                    val rightUnitX = dx * cosTheta - dy * sinTheta
+                    val rightUnitY = dx * sinTheta + dy * cosTheta
+
                     lastSegment.moveTo(prevX + leftUnitX * mPrevRadius, prevY + leftUnitY * mPrevRadius)
                     lastSegment.lineTo(prevX + rightUnitX * mPrevRadius, prevY + rightUnitY * mPrevRadius)
                     lastSegment.lineTo(curX + rightUnitX * mRadius, curY + rightUnitY * mRadius)
@@ -426,28 +372,8 @@ class PenPath (contourType : Type = Type.CIRCLE_SEQUENCE){
         return 0.5f* ((x * directionBiasVector.first + y * directionBiasVector.second) * directionBiasLevel + 2f - directionBiasLevel)
     }
 
-
     enum class Type {
         JOIN_WITH_TANGENTS,
         CIRCLE_SEQUENCE,
     }
-
-    /**
-     * Enum used for different types of upscaling
-     */
-    enum class SmoothType {
-        SLIDING_AVERAGE,
-        QUADRATIC,
-        UPSAMPLE,
-        DOWNSAMPLE,
-        BRUSH_SIZE_SMOOTHING,
-    }
-
 }
-
-
-/*
-    private fun extendContour() {
-
-    }
- */

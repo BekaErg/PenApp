@@ -7,14 +7,14 @@
         style="@style/selection_ring_style" />
 
     <ImageView
-        android:src="@drawable/ic_ballpen"
+        android:src="@drawable/ic_ballpen_fixed_color"
         style="@style/color_circle_style"
         android:rotation="10"
         android:scaleX="0.85"
         android:scaleY="0.85"/>
 
     <ImageView
-        android:src="@drawable/ic_fountainpen"
+        android:src="@drawable/ic_fountainpen_fixed_color"
         style="@style/color_circle_style"
         android:rotation="10"
         android:scaleX="0.85"

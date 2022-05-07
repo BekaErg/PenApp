@@ -19,12 +19,6 @@
 
             <item
                 android:checkable="true"
-                android:checked="true"
-                android:id ="@+id/segment_mode"
-                android:title = "@string/segment_mode"/>
-
-            <item
-                android:checkable="true"
                 android:checked="false"
                 android:id="@+id/lock_zoom"
                 android:title="@string/lock_zoom" />

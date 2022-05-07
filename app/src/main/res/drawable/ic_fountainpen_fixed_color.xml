@@ -2,10 +2,9 @@
     android:width="48dp"
     android:height="48dp"
     android:viewportWidth="200"
-    android:viewportHeight="200"
-    android:tint="?attr/colorControlNormal">
+    android:viewportHeight="200">
   <path
       android:fillColor="@color/tool_color"
       android:pathData="M74,110S152.109,1.243 176,25c23.638,23.506 -85,102 -85,102ZM70,112 L41,120s-6.037,38.047 -29,61c1.578,1.635 1.335,1.356 3,3 31.18,-31.127 43.924,-44.045 44,-44 0.022,0.013 1.919,1.95 2,2 0.791,0.488 -13.533,12.225 -45,43 1.558,1.537 1.456,1.426 3,3 23.045,-22.939 62,-28 62,-28l9,-29Z"
-  />
+      android:fillType="evenOdd"/>
 </vector>

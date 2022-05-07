@@ -7,6 +7,6 @@
         android:icon="@drawable/ic_fountainpen"
         android:title="Fountain Pen" />
     <item android:id="@+id/ball_pen"
-        android:icon="@drawable/ic_ballpen"
+        android:icon="@drawable/ic_ball_pen"
         android:title="Ball Pen" />
 </menu>

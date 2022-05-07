@@ -6,17 +6,17 @@
   <path
       android:fillColor="@color/tool_color"
       android:pathData="M23,163l11,11 22,-10L175,48 152,26 33,142"
-      android:fillType="evenOdd"/>
+      />
   <path
       android:fillColor="@color/tool_color"
       android:pathData="M156,23l22,21s9.423,-7.215 8,-17c-1.225,-8.421 -8.834,-13.086 -18,-12C160.743,15.86 156,23 156,23Z"
-      android:fillType="evenOdd"/>
+      />
   <path
       android:fillColor="@color/tool_color"
       android:pathData="M122,107l5,5 53,-52 -5,-5"
-      android:fillType="evenOdd"/>
+      />
   <path
       android:fillColor="@color/tool_color"
       android:pathData="M22,165l10,10s-10.715,11.278 -16,6S22,165 22,165Z"
-      android:fillType="evenOdd"/>
+      />
 </vector>

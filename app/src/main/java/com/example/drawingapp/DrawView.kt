@@ -4,13 +4,10 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
-import android.util.Log
 import android.view.MotionEvent
 import android.view.View
-import androidx.core.graphics.scale
 import androidx.core.graphics.transform
 import androidx.core.view.doOnLayout
-import kotlin.math.pow
 import kotlin.math.sqrt
 
 class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, attrs) {
@@ -20,11 +17,11 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
             setPenPreset(value)
         }
     var strokeSize = 0f
-    var toolBackUp = selectedTool
+    private var toolBackUp = selectedTool
     var brushColor = Color.BLACK
     var opacity = 1f
     var penMode = true
-    var penPathSettings = BrushSettings()
+    private var penPathSettings = BrushSettings()
     var fillType = Paint.Style.FILL
         set(value) {
             mPaint.style = value
@@ -146,18 +143,6 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
             canvas.restore()
 
             canvas.drawBitmap(mFrameBitmap, null, frameRectF, null)
-        } else if (false && selectedTool == ToolType.TOOL_ERASER){
-            for (parameters in mStrokeHistory) {
-                if (parameters.isErased || parameters.toolType == ToolType.TOOL_ERASER) {
-                    continue
-                }
-                updatePaint(parameters)
-                //mFrameCanvas.drawPath(parameters.dynPath.contourPath, mPaint)
-                parameters.penPath.draw(canvas, mPaint)
-            }
-            canvas.drawBitmap(mCurStrokeBimap, null, frameRectF, mPaint)
-            mEraserPaint.strokeWidth = 4f / scaleX
-            canvas.drawPath(mEraser, mEraserPaint)
         } else {
             canvas.drawBitmap(mFrameBitmap, null, frameRectF, null)
             if (selectedTool == ToolType.LINE || drawingEngine == DrawingEngine.PENPATH_DRAW) {
@@ -310,7 +295,6 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     }
 
     private fun cancelStroke() {
-        Log.i("gela", "stroke was cancelled")
         if (drawingStarted) {
             mCurStrokeCanvas.drawPaint(mClearPaint)
             drawingStarted = false
@@ -338,7 +322,6 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         when (event.action and event.actionMasked) {
             MotionEvent.ACTION_DOWN, 211 -> {
                 mBoundaryRect = RectF(0f, 0f, 0f, 0f)
-                Log.i("gela","action down: $selectedTool")
                 mEraser.addCircle(mCurTouchX, mCurTouchY, mEraserRadius, Path.Direction.CW)
                 eraserHelper()
             }
@@ -348,7 +331,6 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                 eraserHelper()
             }
             MotionEvent.ACTION_UP, 212, MotionEvent.ACTION_CANCEL -> {
-                Log.i("gela","action up: ${event.action} ${mStrokeHistory.size}")
                 if (mErasedIndices.isNotEmpty()) {
                     mStrokeHistory.add(DrawingParameters())
                     mErasedIndices = arrayListOf()
@@ -387,9 +369,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                 parameters.isErased = true
                 mErasedIndices.add(i)
 
-                Log.i("gela", "Bef $mBoundaryRect")
                 rectUnion(mBoundaryRect, parameters.penPath.boundaryRectF)
-                Log.i("gela", "Aft $mBoundaryRect")
                 parameters.penPath.draw(mFrameCanvas, mGhostPaint)
                 //redrawEverything(true)
                 invalidate()
@@ -400,44 +380,34 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     }
 
     private fun applyPressure(pressure : Float) {
+        /*
         mCurStrokeRadius = 0.5f * strokeSize * (
                 penPathSettings.minPressure   +  (1f - penPathSettings.minPressure) * (1f - (1f - pressure).pow(2))
                 )
-        //mCurStrokeRadius = penPathSettings.minPressure * strokeSize + (1f - penPathSettings.minPressure) * strokeSize * pressure
-        //mCurStrokeRadius = strokeSize * (
-        //        sqrt(pressure) * (1f - penPathSettings.minPressure) + penPathSettings.minPressure
-        //        )
-        //mCurStrokeRadius = mCurStrokeRadius.coerceAtLeast(0.5f)
+
+         */
+        mCurStrokeRadius =  (penPathSettings.minPressure   +  (1f - penPathSettings.minPressure) * pressure) *
+                strokeSize *
+                when (selectedTool) {
+                    ToolType.BRUSH -> 1f
+                    ToolType.PEN_BALL -> 0.6f
+                    ToolType.PEN_FOUNTAIN -> 0.5f
+                    else -> 1f
+                }
     }
 
     private fun updatePaint(parameters : DrawingParameters) {
         mPaint.color = parameters.color
         //mPaint.strokeWidth = parameters.brushSize
-        mPaint.strokeWidth = 0.2f
+        mPaint.strokeWidth = 0.1f
         mPaint.alpha = (parameters.alpha * 255).toInt()
     }
 
-    private fun redrawFrame() {
-        mFrameCanvas.drawPaint(mClearPaint)
-        mFrameCanvas.save()
-        mFrameCanvas.setMatrix(matrix)
-        for (parameters in mStrokeHistory) {
-            if (parameters.isErased || parameters.toolType == ToolType.TOOL_ERASER) {
-                continue
-            }
-            updatePaint(parameters)
-            //parameters.dynPath.transform(pathMatrix)
-            parameters.penPath.draw(mFrameCanvas, mPaint)
-            parameters.penPath.draw(mGlobalCanvas, mPaint)
-        }
-        mFrameCanvas.restore()
-    }
 
     private fun redrawEverything(updateGlobal: Boolean) {
         //After Erase: updateGlobal = true and Crop
         //After zooming: updateGlobal = false and no Crop
         //After Redo, undo: updateGlobal = true and no Crop
-
         mFrameCanvas.save()
         mGlobalCanvas.save()
         mFrameCanvas.setMatrix(matrix)
@@ -449,14 +419,12 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         if (updateGlobal) {
             mGlobalCanvas.drawPaint(mClearPaint)
         }
-        //Log.i("gela", "$mBoundaryRect")
 
         for (parameters in mStrokeHistory) {
             if (parameters.isErased || parameters.toolType == ToolType.TOOL_ERASER) {
                 continue
             }
             updatePaint(parameters)
-            //parameters.dynPath.transform(pathMatrix)
             parameters.penPath.draw(mFrameCanvas, mPaint)
             if (updateGlobal) {
                 parameters.penPath.draw(mGlobalCanvas, mPaint)
@@ -548,12 +516,13 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                 penPathSettings.minPressure = 0f
                 penPathSettings.directionBiasLevel = 0f
                 penPathSettings.bufferSize = 4
+                penPathSettings.penPathType = PenPath.Type.CIRCLE_SEQUENCE
             }
             ToolType.PEN_FOUNTAIN -> {
                 penPathSettings.minPressure = 0.7f
-                penPathSettings.directionBiasLevel = 0.8f
+                penPathSettings.directionBiasLevel = 0.7f
                 penPathSettings.directionBiasVector = Pair(1f, -1f)
-                penPathSettings.bufferSize = 4
+                penPathSettings.bufferSize = 5
                 penPathSettings.penPathType = PenPath.Type.CIRCLE_SEQUENCE
             }
             ToolType.PEN_BALL -> {
@@ -561,7 +530,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                 penPathSettings.directionBiasLevel = 0.4f
                 penPathSettings.directionBiasVector = Pair(0f, 1f)
                 penPathSettings.bufferSize = 3
-                penPathSettings.penPathType = PenPath.Type.JOIN_WITH_TANGENTS
+                penPathSettings.penPathType = PenPath.Type.CIRCLE_SEQUENCE
             }
             ToolType.LINE -> {
                 penPathSettings.directionBiasLevel = 0f
@@ -574,7 +543,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         penPathSettings.setPathSettings(mPenPath)
     }
 
-    inner class BrushSettings() {
+    inner class BrushSettings {
         var minGapFactor = 0.1f
         var directionBiasVector = Pair(1f / sqrt(2f), -1f / sqrt(2f))
         var directionBiasLevel = 1f
@@ -583,7 +552,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                 field = value.coerceAtLeast(0f).coerceAtMost(0.5f)
             }
         var bufferSize = 1
-        var penPathType = PenPath.Type.JOIN_WITH_TANGENTS
+        var penPathType = PenPath.Type.CIRCLE_SEQUENCE
 
         fun setPathSettings(penPath: PenPath) {
             penPath.minGapFactor = minGapFactor

@@ -7,9 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Paint
 import android.os.Bundle
-import android.util.Log
 import android.view.*
-import android.widget.ImageView
 import android.widget.LinearLayout
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -28,14 +26,10 @@ import java.util.*
 
 
 class MainActivity : AppCompatActivity(){
-
     private val savePhotoLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument()) {
         if (it != null) {
-            Log.i("uri", it.path!!)
-
             val bitmap = drawView.getBitmap()
-
             contentResolver.openOutputStream(it).use{ bytes ->
                 if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 95, bytes)) {
                     throw IOException("Could not save image")
@@ -93,44 +87,6 @@ class MainActivity : AppCompatActivity(){
         loadDrawingParams()
     }
 
-    //TODO change this by popUp view
-    @SuppressLint("RestrictedApi")
-    private fun penSelectorMenu(context: Context, v : View) {
-        val popup = PopupMenu(context, v)
-        //val inflater = this@MainActivity.getSystemService(LAYOUT_INFLATER_SERVICE) as LayoutInflater
-        popup.inflate(R.menu.brush_menu)
-
-        popup.setOnMenuItemClickListener {
-            when (it.itemId) {
-                R.id.brush -> {
-                    //Toast.makeText(this, "brush", Toast.LENGTH_SHORT).show()
-                    //toolSelector.switchPen("brush")
-                    toolSelector.setTool(ToolType.BRUSH)
-                    drawView.selectedTool = ToolType.BRUSH
-                    true
-                }
-                R.id.fountain_pen -> {
-                    toolSelector.setTool(ToolType.PEN_FOUNTAIN)
-                    drawView.selectedTool = ToolType.PEN_FOUNTAIN
-                    true
-                }
-                R.id.ball_pen -> {
-                    drawView.selectedTool = ToolType.PEN_BALL
-                    toolSelector.setTool(ToolType.PEN_BALL)
-                    true
-                }
-                else -> {
-                    false
-                }
-            }
-        }
-
-        val menuHelper = MenuPopupHelper(this,  popup.menu as MenuBuilder, v)
-        menuHelper.setForceShowIcon(true)
-        menuHelper.show()
-
-    }
-
     override fun onStart() {
         super.onStart()
         activityIsRunning = true
@@ -165,19 +121,12 @@ class MainActivity : AppCompatActivity(){
                 item.isChecked = !item.isChecked
                 if (item.isChecked) {
                     drawView.fillType = Paint.Style.STROKE
+                    drawView.drawingEngine = DrawView.DrawingEngine.PENPATH_DRAW
                 } else {
                     drawView.fillType = Paint.Style.FILL
+                    drawView.drawingEngine = DrawView.DrawingEngine.LAST_SEGMENT
                 }
                 drawView.invalidate()
-                true
-            }
-            R.id.segment_mode -> {
-                item.isChecked = !item.isChecked
-                drawView.drawingEngine = if (item.isChecked) {
-                    DrawView.DrawingEngine.LAST_SEGMENT
-                } else {
-                    DrawView.DrawingEngine.PENPATH_DRAW
-                }
                 true
             }
             R.id.clear_canvas -> {
@@ -195,6 +144,57 @@ class MainActivity : AppCompatActivity(){
         }
     }
 
+    //TODO change this by popUp view
+    @SuppressLint("RestrictedApi")
+    private fun penSelectorMenu(context: Context, v : View) {
+        val popup = PopupMenu(context, v)
+        //val inflater = this@MainActivity.getSystemService(LAYOUT_INFLATER_SERVICE) as LayoutInflater
+        popup.inflate(R.menu.brush_menu)
+
+        popup.setOnMenuItemClickListener {
+            when (it.itemId) {
+                R.id.brush -> {
+                    toolSelector.setTool(ToolType.BRUSH)
+                    drawView.selectedTool = ToolType.BRUSH
+                    true
+                }
+                R.id.fountain_pen -> {
+                    toolSelector.setTool(ToolType.PEN_FOUNTAIN)
+                    drawView.selectedTool = ToolType.PEN_FOUNTAIN
+                    true
+                }
+                R.id.ball_pen -> {
+                    drawView.selectedTool = ToolType.PEN_BALL
+                    toolSelector.setTool(ToolType.PEN_BALL)
+                    true
+                }
+                else -> {
+                    false
+                }
+            }
+        }
+        val menuHelper = MenuPopupHelper(this,  popup.menu as MenuBuilder, v)
+        menuHelper.setForceShowIcon(true)
+        menuHelper.show()
+    }
+
+    private fun moreOptions() {
+        for (view in moreOptions){
+            view.setOnClickListener {
+                when (it.tag) {
+                    "settings" -> {
+                        val intent = Intent(this, SettingsActivity::class.java)
+                        startActivity(intent)
+                        moreOptions.visibility = View.GONE
+                    }
+                    "clear_image" -> {
+                        drawView.clearCanvas()
+                    }
+                }
+            }
+        }
+    }
+
     override fun onWindowFocusChanged(hasFocus : Boolean) {
         super.onWindowFocusChanged(hasFocus)
         loadGeneralSettings()
@@ -204,7 +204,6 @@ class MainActivity : AppCompatActivity(){
         val manager = PreferenceManager.getDefaultSharedPreferences(this)
         val penMode = manager.getBoolean("pen_mode", false)
         drawView.penMode = penMode
-        //Toast.makeText(this, "settings has been updated penMode: $penMode", Toast.LENGTH_SHORT).show()
     }
 
     private fun initDrawView() {
@@ -215,19 +214,16 @@ class MainActivity : AppCompatActivity(){
         opacitySlider = binding.opacitySlider
         moreOptions = binding.moreOptionsLayout
 
-        //drawView = binding.canvasContainer
         drawView = DrawView(this)
         drawView.setBackgroundColor(Color.WHITE)
 
         binding.canvasContainer.addView(drawView)
-        //binding.canvasContainer.addView(View(this))
     }
 
     private fun saveDrawingParams() {
         val sharedPreferences = getSharedPreferences(SHARED_PREFS, MODE_PRIVATE)
         parametersAdapter.copyFromDrawView(drawView)
         parametersAdapter.copyFromPalette(colorPalette)
-        //parametersAdapter.copyFromToolSelector(toolSelector)
 
         val json = Gson().toJson(parametersAdapter)
         val editor = sharedPreferences.edit()
@@ -269,28 +265,10 @@ class MainActivity : AppCompatActivity(){
             drawView.selectedTool = tool
             if (activityIsRunning && alreadySelected && toolGroup == 0) {
                 penSelectorMenu(this@MainActivity, view)
-                //binding.popUpButton.performClick()
-                //penSelectorMenu(binding.popUpButton)
             }
         }
     }
 
-    private fun moreOptions() {
-        for (view in moreOptions){
-            view.setOnClickListener {
-                when (it.tag) {
-                    "settings" -> {
-                        val intent = Intent(this, SettingsActivity::class.java)
-                        startActivity(intent)
-                        moreOptions.visibility = View.GONE
-                    }
-                    "clear_image" -> {
-                        drawView.clearCanvas()
-                    }
-                }
-            }
-        }
-    }
 
     private fun brushSizeSelecting() {
         val brushSizeDummy = binding.dummyBrushSize
@@ -320,7 +298,6 @@ class MainActivity : AppCompatActivity(){
             Slider.OnChangeListener { _, value, _ ->
                 drawView.opacity = value / 100
                 binding.opacityIcon.progress = value.toInt()
-                //Toast.makeText(this, "opacity is $value", Toast.LENGTH_SHORT).show()
             }
 
         )
@@ -355,11 +332,9 @@ class MainActivity : AppCompatActivity(){
         var strokeSize = 10f
         var colorList = arrayListOf(Color.RED, Color.GREEN, Color.BLUE)
         var colorIdx = 0
-        //var tool = ToolTypes.BRUSH
 
         fun copyToDrawView(drawView: DrawView) {
             drawView.strokeSize = strokeSize
-            //drawView.selectedTool = tool
             drawView.brushColor = colorList[colorIdx]
         }
 
@@ -370,17 +345,6 @@ class MainActivity : AppCompatActivity(){
             }
             palette.selectedIdx = colorIdx
         }
-        /*
-        fun copyToTool(toolSelector: ToolSelectorLayout){
-            toolSelector.setTool(tool)
-            //Todo why does using parent class members cause an error (commenting Gson in loadParameters fixes)
-            /*if (drawViewIsInitialized) {
-                Toast.makeText(baseContext, "gela", Toast.LENGTH_SHORT).show()
-            }
-            */
-        }
-
-         */
 
         fun copyToBrushSlider(view: Slider) {
             view.value = strokeSize
@@ -388,18 +352,11 @@ class MainActivity : AppCompatActivity(){
 
         fun copyFromDrawView(drawView: DrawView) {
             strokeSize = drawView.strokeSize
-            //tool = drawView.selectedTool
         }
         fun copyFromPalette(palette : ColorPalette) {
             colorList = palette.getColors()
             colorIdx = palette.selectedIdx
         }
-        /*
-        fun copyFromToolSelector(toolSelector: ToolSelectorLayout) {
-            tool = toolSelector.getTool()
-        }
-         */
-
     }
 
     companion object {
@@ -409,130 +366,3 @@ class MainActivity : AppCompatActivity(){
 
 
 
-
-
-
-
-
-
-
-
-
-
-/*
-
-    private val pickPhotoLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
-    ){
-        if (it != null) {
-            val imageView = ImageView(this)
-            imageView.setImageURI(it)
-            //TODO
-            //binding.frameForCanvas.addView(imageView)
-        }
-        Snackbar.make(binding.root, "this is the URI: $it", Snackbar.LENGTH_INDEFINITE)
-            .setAction("Cancel") {
-        }.show()
-        //Toast.makeText(this, imageURI.toString(), Toast.LENGTH_SHORT).show()
-    }
-
-
-
-    private fun loadBitmap() {
-        pickPhotoLauncher.launch("image/*")
-        //imageView.setImageURI(imageURI)
-        //binding.frameForCanvas.addView(imageView)
-        /*
-        val pickPhotoIntent = Intent(Intent.ACTION_PICK,
-        MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
-        startActivityForResult(pickPhotoIntent, 0)
-         */
-    }
-
-
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ){
-        if (it) {
-            Log.i("permission: ", "granted")
-        } else {
-            Log.i("permission: ", "Denied")
-        }
-    }
-
-    private fun requestPermission(permission: String) {
-        when {
-            ContextCompat.checkSelfPermission(
-                this,
-                permission
-            ) == PackageManager.PERMISSION_GRANTED -> {
-                Toast.makeText(this, "permission is granted", Toast.LENGTH_SHORT).show()
-            }
-            ActivityCompat.shouldShowRequestPermissionRationale(
-                this, permission
-            ) -> {
-            Snackbar.make(binding.root, "You need to grant permission in order to save the image", Snackbar.LENGTH_LONG)
-                .setAction("Review Permission") {
-                    requestPermissionLauncher.launch(
-                        permission)
-                }.show()
-            }
-            else -> {
-                requestPermissionLauncher.launch(
-                    permission)
-            }
-        }
-    }
-
-
-
-
-
-
-
-
-
-
-
-    private fun saveBitmap(uri: Uri): String {
-        val bitmap = drawView.getBitmap()
-        var result = ""
-        try {
-            val bytes = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 95, bytes)
-            //val path = getExternalFilesDir(Environment.DIRECTORY_PICTURES).toString();
-            //val f = File(externalCacheDir!!.absolutePath + File.separator + "gela.jpg")
-
-            val f = File(externalCacheDir!!.absolutePath + File.separator + "gela.jpg")
-            Log.i("uri2", f.path)
-
-            //val f = File(uri.path!! + ".jpg")
-            val fos = FileOutputStream(f)
-            fos.write(bytes.toByteArray())
-            fos.close()
-
-            result = f.absolutePath
-        } catch (e: Exception) {
-            result = "failed" + uri.path!!
-            e.printStackTrace()
-        }
-        return result
-    }
-
-    fun updateOrRequestPermission(){
-        readPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-        writePermission = ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-        writePermission = writePermission || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
-
-        val permissionRequests = mutableListOf<String>()
-        if (!readPermission) {
-            permissionRequests.add(Manifest.permission.READ_EXTERNAL_STORAGE)
-        }
-        if (!writePermission) {
-            permissionRequests.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        }
-        ActivityCompat.requestPermissions(this, permissionRequests.toTypedArray(), 0)
-
-    }
-
- */

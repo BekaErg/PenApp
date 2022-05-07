@@ -19,19 +19,19 @@
             android:visibility="visible"
             android:tag="brush"
             android:id="@+id/brush"
-            android:src="@drawable/ic_pen"
+            android:src="@drawable/ic_pen_fixed_color"
             style="@style/color_circle_style" />
         <ImageView
             android:visibility="invisible"
             android:tag="fountain_pen"
             android:id="@+id/fountain_pen"
-            android:src="@drawable/ic_fountainpen"
+            android:src="@drawable/ic_fountainpen_fixed_color"
             style="@style/color_circle_style" />
         <ImageView
             android:visibility="invisible"
             android:tag="ball_pen"
             android:id="@+id/ball_pen"
-            android:src="@drawable/ic_ballpen"
+            android:src="@drawable/ic_ballpen_fixed_color"
             style="@style/color_circle_style" />
     </FrameLayout>
 

@@ -4,14 +4,12 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.util.AttributeSet
-import android.util.Log
 import android.view.*
 import android.widget.LinearLayout
-import android.widget.Toast
 
 open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : LinearLayout(context, attrs)  {
     var lockZoom = false
-    var maxZoom = 20f
+    var maxZoom = 8f
     var minZoom = 0.3f
     private var mScaleDetector = ScaleGestureDetector(context, ScaleListener())
     private var mScale = 1f
@@ -74,12 +72,10 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event : MotionEvent) : Boolean {
         this.requestFocus()
-        //if Pressed outside child View, here we end up after child ontouchview
+        //if Pressed outside child View, here we end up after child onTouchView
         mPointerCount = event.pointerCount
         if (mPointerCount  <= 1 || event.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS) {
             return true
-        } else if (mPointerCount > 3 && multiTouchTriggered) {
-            //multiTouchEnded = true
         }
         mCurX = event.getX(0)
         mCurY = event.getY(0)
