@@ -1,3 +1,4 @@
+
 <resources>
     <string name="app_name">Drawing App</string>
     <string name="line">Line</string>
@@ -16,8 +17,7 @@
     <!-- Sync Preferences -->
     <string name="sync_title">Sync email periodically</string>
     <string name="attachment_title">Download incoming attachments</string>
-    <string name="attachment_summary_on">Automatically download attachments for incoming emails
-    </string>
+    <string name="attachment_summary_on">Automatically download attachments for incoming emails </string>
     <string name="attachment_summary_off">Only download attachments when manually requested</string>
     <string name="clear_canvas">Clear Canvas</string>
     <string name="save_image">Save Image</string>
@@ -34,5 +34,8 @@
     <string name="drawing_engine_path">Whole Path</string>
     <string name="drawing_engine_segment">Draw Segment</string>
     <string name="segment_mode">Segment Mode</string>
+    <string name="brush">Brush</string>
+    <string name="fountain_pen">Fountain Pen</string>
+    <string name="ball_pen">Ball Pen</string>
 
 </resources>

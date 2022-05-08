@@ -276,12 +276,8 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     }
 
     private fun finishStroke() {
-
         mPenPath.draw(mGlobalCanvas, mPaint)
         mPenPath.finish()
-
-        //mBrushPath.postSmooth(PenPath.SmoothType.BRUSH_SIZE_SMOOTHING, 5)
-        //mFrameCanvas.drawBitmap(mCurStrokeBimap, 0f, 0f, mPaint)
 
         mCurStrokeCanvas.drawPaint(mClearPaint)
 
@@ -340,7 +336,9 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                     selectedTool = toolBackUp
                 }
                 drawingStarted = false
-                redrawEverything(true)
+                if (mBoundaryRect != RectF(0f, 0f, 0f, 0f)) {
+                    redrawEverything(true)
+                }
             }
             else -> return false
         }

@@ -2,11 +2,11 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:id="@+id/brush"
         android:icon="@drawable/ic_pen"
-        android:title="Brush" />
+        android:title="@string/brush" />
     <item android:id = "@+id/fountain_pen"
         android:icon="@drawable/ic_fountainpen"
-        android:title="Fountain Pen" />
+        android:title="@string/fountain_pen" />
     <item android:id="@+id/ball_pen"
         android:icon="@drawable/ic_ball_pen"
-        android:title="Ball Pen" />
+        android:title="@string/ball_pen" />
 </menu>
