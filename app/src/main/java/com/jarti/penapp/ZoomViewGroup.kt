@@ -110,8 +110,6 @@ open class ZoomViewGroup (context: Context, attrs: AttributeSet? = null) : Linea
         return true
     }
 
-
-
     private inner class ScaleListener : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScale(detector : ScaleGestureDetector) : Boolean {
             mScaleFactor = detector.scaleFactor
