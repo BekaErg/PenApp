@@ -1,4 +1,4 @@
-package com.example.drawingapp
+package com.jarti.penapp
 
 enum class ToolType {
     BRUSH,

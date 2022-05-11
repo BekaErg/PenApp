@@ -1,4 +1,4 @@
-package com.example.drawingapp
+package com.jarti.penapp
 
 import android.content.Context
 import android.util.AttributeSet
@@ -7,6 +7,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import androidx.core.view.get
 import androidx.core.view.iterator
+import com.example.penapp.R
 
 class ToolSelectorLayout (context: Context, attrs: AttributeSet): LinearLayout(context, attrs) {
     private var selectedTool = ToolType.BRUSH

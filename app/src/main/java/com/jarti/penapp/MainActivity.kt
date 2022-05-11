@@ -1,4 +1,4 @@
-package com.example.drawingapp
+package com.jarti.penapp
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -14,15 +14,16 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.view.menu.MenuBuilder
 import androidx.appcompat.view.menu.MenuPopupHelper
 import androidx.appcompat.widget.PopupMenu
-import androidx.core.view.iterator
 import androidx.preference.PreferenceManager
-import com.example.drawingapp.databinding.ActivityMainBinding
+import com.example.penapp.R
+import com.example.penapp.databinding.ActivityMainBinding
 import com.google.android.material.slider.Slider
 import com.google.android.material.snackbar.Snackbar
 import com.google.gson.Gson
 import com.jarti.ColorPickerView.ColorPickerView
 import java.io.IOException
 import java.util.*
+
 
 
 class MainActivity : AppCompatActivity(){
@@ -74,7 +75,6 @@ class MainActivity : AppCompatActivity(){
         brushSizeSelecting()
         undoRedo()
         opacitySlider()
-        moreOptions()
 
         //make invisible
         drawView.setOnTouchListener { _ : View, event : MotionEvent ->
@@ -122,6 +122,7 @@ class MainActivity : AppCompatActivity(){
                 if (item.isChecked) {
                     drawView.fillType = Paint.Style.STROKE
                     drawView.drawingEngine = DrawView.DrawingEngine.PENPATH_DRAW
+                    Snackbar.make(this.drawView,"This will decrease performance when drawing long continuous path", Snackbar.LENGTH_LONG).show()
                 } else {
                     drawView.fillType = Paint.Style.FILL
                     drawView.drawingEngine = DrawView.DrawingEngine.LAST_SEGMENT
@@ -178,22 +179,6 @@ class MainActivity : AppCompatActivity(){
         menuHelper.show()
     }
 
-    private fun moreOptions() {
-        for (view in moreOptions){
-            view.setOnClickListener {
-                when (it.tag) {
-                    "settings" -> {
-                        val intent = Intent(this, SettingsActivity::class.java)
-                        startActivity(intent)
-                        moreOptions.visibility = View.GONE
-                    }
-                    "clear_image" -> {
-                        drawView.clearCanvas()
-                    }
-                }
-            }
-        }
-    }
 
     override fun onWindowFocusChanged(hasFocus : Boolean) {
         super.onWindowFocusChanged(hasFocus)
@@ -218,6 +203,7 @@ class MainActivity : AppCompatActivity(){
         drawView.setBackgroundColor(Color.WHITE)
 
         binding.canvasContainer.addView(drawView)
+        drawView.selectedTool = ToolType.PEN_BALL
     }
 
     private fun saveDrawingParams() {

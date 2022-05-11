@@ -1,11 +1,11 @@
-package com.example.drawingapp
+package com.jarti.penapp
 
 import android.os.Bundle
 import android.view.MenuItem
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceManager
+import com.example.penapp.R
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -20,7 +20,6 @@ class SettingsActivity : AppCompatActivity() {
                 .commit()
         }
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        actionBar?.title = "gela"
     }
 
 
@@ -28,18 +27,14 @@ class SettingsActivity : AppCompatActivity() {
         super.onDestroy()
         val manager = PreferenceManager.getDefaultSharedPreferences(this)
         val penMode = manager.getBoolean("pen_mode", false)
-        Toast.makeText(this, "destroyed $penMode", Toast.LENGTH_SHORT).show()
     }
 
     override fun onOptionsItemSelected(item : MenuItem) : Boolean {
         return when (item.itemId) {
             android.R.id.home -> {
                 finish()
-                // Another possibility is below
-                //onBackPressed()
                 true
             }
-
             else -> super.onOptionsItemSelected(item)
         }
     }

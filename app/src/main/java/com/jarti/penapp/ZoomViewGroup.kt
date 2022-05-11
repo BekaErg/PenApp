@@ -1,4 +1,4 @@
-package com.example.drawingapp
+package com.jarti.penapp
 
 import android.annotation.SuppressLint
 import android.content.Context

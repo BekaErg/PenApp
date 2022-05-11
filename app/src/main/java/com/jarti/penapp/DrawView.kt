@@ -1,5 +1,6 @@
-package com.example.drawingapp
+package com.jarti.penapp
 
+import PenPath
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.*
@@ -58,7 +59,6 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         style = fillType
         strokeWidth = 0.5f
         //shader = BitmapShader(BitmapFactory.decodeResource(resources, R.drawable.brush200).scale(2, 2, false), Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
-        //maskFilter = BlurMaskFilter(0.00001f, BlurMaskFilter.Blur.NORMAL)
     }
     private var mEraserPaint = Paint().apply {
         isAntiAlias = true
@@ -71,7 +71,6 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
         isAntiAlias = true
         style = Paint.Style.FILL
         strokeWidth = 0.5f
-        //xfermode = PorterDuffXfermode(PorterDuff.Mode.LIGHTEN)
         color = 0xDDFFFFFF.toInt()
     }
     private val mClearPaint = Paint().apply {
@@ -152,19 +151,8 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
             }
         }
 
-        /*
-        canvas.drawBitmap(mFrameBitmap, null, frameRectF, null)
-        if (selectedTool == ToolType.LINE || drawingEngine == DrawingEngine.PENPATH_DRAW) {
-            mBrushPath.draw(canvas, mPaint)
-        } else {
-            canvas.drawBitmap(mCurStrokeBimap, null, frameRectF, mPaint)
-        }
-         */
-
         mEraserPaint.strokeWidth = 4f / scaleX
         canvas.drawPath(mEraser, mEraserPaint)
-
-        //draw Eraser
     }
 
     override fun onGenericMotionEvent(event : MotionEvent) : Boolean {
@@ -197,7 +185,6 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     }
 
     private fun drawLine(event : MotionEvent) : Boolean {
-        //TODO add Lock pressure mode
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 startStroke(null)
@@ -234,7 +221,6 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                     mCurTouchY = event.getHistoricalY(i)
                     applyPressure(event.getHistoricalPressure(i))
                     mPenPath.lineTo(mCurTouchX, mCurTouchY, mCurStrokeRadius)
-
                     mPenPath.drawLastSegment(mCurStrokeCanvas, mBlackPaint)
                 }
             }
@@ -268,7 +254,6 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
             mCurStrokeRadius = strokeSize / 2
         }
         mStrokeFuture.clear()
-        //mStrokeHistory.add(DrawingParameters())
         mStrokeHistory.add(DrawingParameters())
         drawingStarted = true
         penPathSettings.setPathSettings(mPenPath)
@@ -276,8 +261,8 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     }
 
     private fun finishStroke() {
-        mPenPath.draw(mGlobalCanvas, mPaint)
         mPenPath.finish()
+        mPenPath.draw(mGlobalCanvas, mPaint)
 
         mCurStrokeCanvas.drawPaint(mClearPaint)
 
@@ -298,7 +283,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
             return
         }
         when (selectedTool) {
-            ToolType.PEN_BALL,ToolType.PEN_FOUNTAIN, ToolType.BRUSH, ToolType.LINE -> {
+            ToolType.PEN_BALL, ToolType.PEN_FOUNTAIN, ToolType.BRUSH, ToolType.LINE -> {
                 mStrokeHistory.removeLast()
                 mPenPath.rewind()
             }
@@ -390,6 +375,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
                     ToolType.BRUSH -> 1f
                     ToolType.PEN_BALL -> 0.6f
                     ToolType.PEN_FOUNTAIN -> 0.5f
+                    ToolType.LINE -> 0.75f
                     else -> 1f
                 }
     }
@@ -397,7 +383,7 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     private fun updatePaint(parameters : DrawingParameters) {
         mPaint.color = parameters.color
         //mPaint.strokeWidth = parameters.brushSize
-        mPaint.strokeWidth = 0.1f
+        mPaint.strokeWidth = 0.15f
         mPaint.alpha = (parameters.alpha * 255).toInt()
     }
 

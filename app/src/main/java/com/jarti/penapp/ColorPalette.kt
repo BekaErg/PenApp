@@ -1,4 +1,4 @@
-package com.example.drawingapp
+package com.jarti.penapp
 
 import android.content.Context
 import android.graphics.*
@@ -7,6 +7,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import androidx.core.view.get
+import com.example.penapp.R
 
 class ColorPalette(context: Context, attrs: AttributeSet): LinearLayout(context, attrs){
     private var frameList = arrayListOf<FrameLayout>()
