@@ -428,28 +428,34 @@ class DrawView(context : Context, attrs : AttributeSet? = null) : View(context, 
     fun undo() {
         if (mStrokeHistory.isEmpty()) return
         val params = mStrokeHistory.removeLast()
+        mBoundaryRect = params.penPath.boundaryRectF
         assert(!params.isErased)
         if (params.toolType == ToolType.TOOL_ERASER) {
             for (i in params.eraserIdx) {
                 mStrokeHistory[i].isErased = false
+                rectUnion(mBoundaryRect, params.penPath.boundaryRectF)
             }
         }
         mStrokeFuture.add(params)
         redrawEverything(true)
         invalidate()
+        mBoundaryRect = RectF(0f, 0f, 0f, 0f)
     }
 
     fun redo() {
         if (mStrokeFuture.isEmpty()) return
         val params = mStrokeFuture.removeLast()
+        mBoundaryRect = params.penPath.boundaryRectF
         mStrokeHistory.add(params)
         if (params.toolType == ToolType.TOOL_ERASER) {
             for (i in params.eraserIdx) {
                 mStrokeHistory[i].isErased = true
+                rectUnion(mBoundaryRect, params.penPath.boundaryRectF)
             }
         }
         redrawEverything(true)
         invalidate()
+        mBoundaryRect = RectF(0f, 0f, 0f, 0f)
     }
 
     fun clearCanvas() {
