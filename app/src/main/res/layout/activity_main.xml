@@ -7,7 +7,7 @@
     android:layout_height="match_parent"
     android:background="@color/dark_grey"
     app:barrierDirection="right"
-    tools:context="com.jarti.penapp.MainActivity">
+    tools:context="jrt.bekaerg.penapp.MainActivity">
 
     <Button
         android:id="@+id/pop_up_button"
@@ -22,7 +22,7 @@
         app:layout_constraintTop_toTopOf="@+id/divisor1"  />
 
 
-    <com.jarti.penapp.ZoomViewGroup
+    <jrt.bekaerg.penapp.ZoomViewGroup
         android:id="@+id/canvas_container"
         android:layout_width="0dp"
         android:layout_height="0dp"
@@ -45,7 +45,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <com.jarti.penapp.ColorPalette
+    <jrt.bekaerg.penapp.ColorPalette
         android:id="@+id/color_palette_main"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -75,7 +75,7 @@
 
 
 
-    <com.jarti.penapp.ToolSelectorLayout
+    <jrt.bekaerg.penapp.ToolSelectorLayout
         android:id="@+id/drawing_tools"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

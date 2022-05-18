@@ -1,4 +1,4 @@
-package com.jarti.penapp
+package jrt.bekaerg.penapp
 
 import android.os.Bundle
 import android.view.MenuItem

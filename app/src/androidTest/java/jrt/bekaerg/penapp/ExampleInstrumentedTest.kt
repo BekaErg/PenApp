@@ -1,4 +1,4 @@
-package com.jarti.penapp
+package jrt.bekaerg.penapp
 
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4

@@ -1,4 +1,4 @@
-package com.jarti.penapp
+package jrt.bekaerg.penapp
 
 import org.junit.Test
 

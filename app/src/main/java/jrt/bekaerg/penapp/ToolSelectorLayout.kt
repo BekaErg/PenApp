@@ -1,4 +1,4 @@
-package com.jarti.penapp
+package jrt.bekaerg.penapp
 
 import android.content.Context
 import android.util.AttributeSet

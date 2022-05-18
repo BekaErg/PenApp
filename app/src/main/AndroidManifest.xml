@@ -16,7 +16,7 @@
         android:theme="@style/Theme.App">
 
         <activity
-            android:name="com.jarti.penapp.MainActivity"
+            android:name="jrt.bekaerg.penapp.MainActivity"
             android:configChanges="keyboardHidden|orientation|screenSize"
             android:screenOrientation="portrait"
             android:exported="true">
@@ -27,11 +27,11 @@
             </intent-filter>
         </activity>
         <activity
-            android:name="com.jarti.penapp.SettingsActivity"
+            android:name="jrt.bekaerg.penapp.SettingsActivity"
             android:exported="false"
             android:label="@string/title_activity_settings"
             android:theme="@style/SettingsTheme"
-            android:parentActivityName="com.jarti.penapp.MainActivity"/>
+            android:parentActivityName="jrt.bekaerg.penapp.MainActivity"/>
     </application>
 
 </manifest>

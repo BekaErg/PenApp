@@ -1,4 +1,4 @@
-package com.jarti.penapp
+package jrt.bekaerg.penapp
 
 import PenPath
 import android.annotation.SuppressLint
