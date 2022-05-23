@@ -8,8 +8,8 @@ The app was originally created to demonstrate and test PenPath and ColorPickerTr
 - Erase by holding stylus button
 
 ## ScreenShots
-<a href="url"><img src="ScreenShots/PenAppScreenshot1.jpg" width="250" ></a>
-<a href="url"><img src="ScreenShots/PenAppScreenshot3.jpg" width="250" ></a>
-<a href="url"><img src="ScreenShots/PenAppScreenshot2.jpg" width="250" ></a>
+<a href="ScreenShots/PenAppScreenshot1.jpg"><img src="ScreenShots/PenAppScreenshot1.jpg" width="250" ></a>
+<a href="ScreenShots/PenAppScreenshot1.jpg"><img src="ScreenShots/PenAppScreenshot3.jpg" width="250" ></a>
+<a href="ScreenShots/PenAppScreenshot1.jpg"><img src="ScreenShots/PenAppScreenshot2.jpg" width="250" ></a>
 
 
